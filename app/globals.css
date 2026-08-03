@@ -1,26 +1,108 @@
 @import "tailwindcss";
+@import "../styles/tokens.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-txt: var(--txt);
+  --color-txt-2: var(--txt-2);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-green-900: var(--green-900);
+  --color-green-700: var(--green-700);
+  --color-green: var(--green);
+  --color-green-400: var(--green-400);
+  --color-green-200: var(--green-200);
+  --color-green-50: var(--green-50);
+  --color-amber: var(--amber);
+  --color-red: var(--red);
+  --radius-panel: var(--radius);
+  --radius-card: var(--radius-sm);
+  --radius-pill: var(--radius-pill);
+  --shadow-soft-sm: var(--shadow-sm);
+  --shadow-soft: var(--shadow);
+  --shadow-soft-lg: var(--shadow-lg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html, body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  letter-spacing: -0.02em;
+}
+
+/* Gestreept patroon: handtekening voor "nog niet gebeurd" of "leeg" */
+.hatched {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--line) 0px,
+    var(--line) 2px,
+    var(--surface-2) 2px,
+    var(--surface-2) 7px
+  );
+}
+
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+.panel-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Dun scrollbar-uiterlijk voor het bord (horizontaal) */
+.board-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+.board-scroll::-webkit-scrollbar { height: 6px; }
+.board-scroll::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 999px;
+}
+.board-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* Dunne scrollbar in daglijsten — alleen zichtbaar bij hover */
+.thin-scroll {
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+}
+.thin-scroll:hover {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted-2) 40%, transparent) transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+.thin-scroll:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted-2) 40%, transparent);
+}
+.thin-scroll:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }

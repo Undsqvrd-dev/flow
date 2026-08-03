@@ -1,0 +1,62 @@
+:root{
+  /* vlakken */
+  --bg:#E2E8E4;            /* app-achtergrond, iets donkerder zodat panelen opvallen */
+  --surface:#FFFFFF;       /* kaarten, panelen */
+  --surface-2:#F7F9F8;     /* subtiele secties, inputs */
+  --surface-3:#EDF1EE;     /* hover op grijze vlakken */
+  --line:#E4E9E6;          /* randen */
+  --line-2:#D3DAD6;        /* sterkere randen, hover */
+
+  /* tekst */
+  --txt:#171C19;
+  --txt-2:#3E4945;
+  --muted:#78857F;
+  --muted-2:#A2ADA8;
+
+  /* groen */
+  --green-900:#0E3524;     /* donkere accentkaarten (timer, dagfocus) */
+  --green-700:#13603D;
+  --green:#1F9254;         /* primair: knoppen, actieve nav, voortgang */
+  --green-400:#4FB87B;
+  --green-200:#A9DCC0;     /* secundaire staven, lichte vlakken */
+  --green-50:#EAF6EF;      /* tint-achtergrond, actieve nav-item */
+
+  /* status (spaarzaam) */
+  --amber:#D98B14;
+  --red:#D24A4A;
+
+  --radius:20px;           /* panelen */
+  --radius-sm:14px;        /* kaarten */
+  --radius-pill:999px;     /* knoppen, chips */
+  --shadow-sm:0 1px 2px rgba(16,24,20,.04);
+  --shadow:0 4px 16px rgba(16,24,20,.06);
+  --shadow-lg:0 16px 40px rgba(16,24,20,.12);
+}
+
+.dark{
+  --bg:#0E1211;
+  --surface:#161C19;
+  --surface-2:#1C2320;
+  --surface-3:#232B27;
+  --line:#28312D;
+  --line-2:#37423C;
+
+  --txt:#E9EFEB;
+  --txt-2:#C3CDC7;
+  --muted:#8A9A92;
+  --muted-2:#5F6C66;
+
+  --green-900:#0B2C1E;
+  --green-700:#177348;
+  --green:#2FC97A;         /* iets helderder voor contrast op donker */
+  --green-400:#57D998;
+  --green-200:#2A5B45;
+  --green-50:#15291F;
+
+  --amber:#E6A33A;
+  --red:#E56B6B;
+
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3);
+  --shadow:0 4px 16px rgba(0,0,0,.35);
+  --shadow-lg:0 16px 40px rgba(0,0,0,.5);
+}

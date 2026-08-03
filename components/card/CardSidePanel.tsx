@@ -1,0 +1,152 @@
+'use client';
+
+import type { Task } from '@/lib/types';
+import { Segmented } from '@/components/ui/segmented';
+import { Input } from '@/components/ui/input';
+import { useBoardStore } from '@/stores/useBoardStore';
+import { useGoalsStore, activeGoals } from '@/stores/useGoalsStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
+import { DAY_LABELS, DAYPART_LABELS, DAYPARTS, WEEKDAY_KEYS, isBoardDayKey, weekOfNearestDayKey } from '@/lib/dates';
+import type { BoardDayKey, DayKey } from '@/lib/types';
+import { cn } from '@/lib/utils';
+
+const DAY_OPTIONS: DayKey[] = ['dump', 'wachtruimte', 'algemeen', ...WEEKDAY_KEYS];
+
+const ESTIMATES = [1, 3, 5, 15, 30, 60, 120];
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="panel-label mb-2">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+/** Rechterpaneel van de kaartmodal: metadata — alles optioneel. */
+export function CardSidePanel({ task }: { task: Task }) {
+  const updateTask = useBoardStore((s) => s.updateTask);
+  const goals = useGoalsStore((s) => s.goals);
+  const labelDefs = useSettingsStore((s) => s.settings.labels ?? []);
+
+  const zakelijk = activeGoals(goals).filter((g) => g.scope === 'zakelijk');
+  const prive = activeGoals(goals).filter((g) => g.scope === 'prive');
+
+  return (
+    <div className="flex w-full shrink-0 flex-col gap-5 rounded-r-panel bg-surface-2 px-4 pb-4 pt-10 md:w-[240px] md:pt-12">
+      <Section label="Doel">
+        <select
+          value={task.goalId ?? ''}
+          onChange={(e) => updateTask(task.id, { goalId: e.target.value || null })}
+          className="h-9 w-full cursor-pointer rounded-[10px] border border-line bg-surface px-2.5 text-sm text-txt outline-none focus:border-green"
+        >
+          <option value="">Geen doel</option>
+          {zakelijk.length > 0 && (
+            <optgroup label="Zakelijk">
+              {zakelijk.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+            </optgroup>
+          )}
+          {prive.length > 0 && (
+            <optgroup label="Privé">
+              {prive.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+            </optgroup>
+          )}
+        </select>
+      </Section>
+
+      <Section label="Dag">
+        <select
+          value={task.dayKey}
+          onChange={(e) => {
+            const dayKey = e.target.value as DayKey;
+            const patch: Partial<Task> = {
+              dayKey,
+              daypart: dayKey === 'algemeen' || dayKey === 'dump' || dayKey === 'wachtruimte' || dayKey === 'gedaan'
+                ? null
+                : task.daypart,
+            };
+            if (isBoardDayKey(dayKey)) {
+              patch.weekOf = weekOfNearestDayKey(dayKey as BoardDayKey);
+            }
+            updateTask(task.id, patch);
+          }}
+          className="h-9 w-full cursor-pointer rounded-[10px] border border-line bg-surface px-2.5 text-sm text-txt outline-none focus:border-green"
+        >
+          {DAY_OPTIONS.map((key) => (
+            <option key={key} value={key}>{DAY_LABELS[key]}</option>
+          ))}
+        </select>
+      </Section>
+
+      <Section label="Dagdeel">
+        <Segmented
+          options={DAYPARTS.map((d) => ({ value: d, label: DAYPART_LABELS[d] }))}
+          value={task.daypart}
+          onChange={(v) => updateTask(task.id, { daypart: v })}
+          className="w-full [&>button]:flex-1"
+        />
+      </Section>
+
+      <Section label="Tijdsschatting">
+        <div className="flex flex-wrap gap-1.5">
+          {ESTIMATES.map((min) => (
+            <button
+              key={min}
+              type="button"
+              onClick={() => updateTask(task.id, { estimateMin: task.estimateMin === min ? null : min })}
+              className={cn(
+                'rounded-pill border px-2.5 py-1 text-[12px] font-medium transition-colors duration-150 cursor-pointer',
+                task.estimateMin === min
+                  ? 'border-green bg-green-50 text-green'
+                  : 'border-line text-txt-2 hover:border-line-2',
+              )}
+            >
+              {min}m
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      <Section label="Labels">
+        {labelDefs.length === 0 ? (
+          <p className="text-[12px] text-muted">Nog geen labels. Maak ze aan bij Instellingen.</p>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {labelDefs.map((label) => {
+              const active = task.labels.includes(label.id);
+              return (
+                <button
+                  key={label.id}
+                  type="button"
+                  onClick={() =>
+                    updateTask(task.id, {
+                      labels: active
+                        ? task.labels.filter((l) => l !== label.id)
+                        : [...task.labels, label.id],
+                    })
+                  }
+                  className={cn(
+                    'flex items-center gap-2 rounded-[8px] px-2 py-1.5 text-left text-[12.5px] transition-colors duration-150 cursor-pointer',
+                    active ? 'bg-green-50 text-green font-medium' : 'text-txt-2 hover:bg-surface',
+                  )}
+                >
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-pill" style={{ backgroundColor: label.color }} />
+                  {label.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Section>
+
+      <Section label="Deadline">
+        <Input
+          type="date"
+          value={task.dueDate ?? ''}
+          onChange={(e) => updateTask(task.id, { dueDate: e.target.value || null })}
+          className="h-8"
+        />
+      </Section>
+    </div>
+  );
+}
