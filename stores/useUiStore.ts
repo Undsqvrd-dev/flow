@@ -13,6 +13,8 @@ interface UiState {
   focusMode: boolean;
   sidebarCollapsed: boolean;
   weekTrayOpen: boolean;
+  /** Mobiel: volledige navigatie-drawer. Niet persistent. */
+  mobileNavOpen: boolean;
 
   setQuickCaptureOpen: (v: boolean) => void;
   setNewTaskOpen: (v: boolean, dayKey?: DayKey | null) => void;
@@ -23,6 +25,7 @@ interface UiState {
   toggleSidebar: () => void;
   setWeekTrayOpen: (v: boolean) => void;
   toggleWeekTray: () => void;
+  setMobileNavOpen: (v: boolean) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -35,6 +38,7 @@ export const useUiStore = create<UiState>()(
       focusMode: false,
       sidebarCollapsed: false,
       weekTrayOpen: false,
+      mobileNavOpen: false,
 
       setQuickCaptureOpen: (v) => set({ quickCaptureOpen: v }),
       setNewTaskOpen: (v, dayKey) =>
@@ -63,6 +67,7 @@ export const useUiStore = create<UiState>()(
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setWeekTrayOpen: (v) => set({ weekTrayOpen: v }),
       toggleWeekTray: () => set((s) => ({ weekTrayOpen: !s.weekTrayOpen })),
+      setMobileNavOpen: (v) => set({ mobileNavOpen: v }),
     }),
     {
       name: 'flow-ui',

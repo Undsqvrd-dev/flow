@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Plus, Focus as FocusIcon, Lightbulb } from 'lucide-react';
+import { Plus, Focus as FocusIcon, Lightbulb, Leaf } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useUiStore } from '@/stores/useUiStore';
@@ -28,6 +28,7 @@ export function Topbar() {
   const setFocusMode = useUiStore((s) => s.setFocusMode);
   const setNewTaskOpen = useUiStore((s) => s.setNewTaskOpen);
   const setQuickCaptureOpen = useUiStore((s) => s.setQuickCaptureOpen);
+  const setMobileNavOpen = useUiStore((s) => s.setMobileNavOpen);
   const [todayLabel, setTodayLabel] = useState('');
 
   useEffect(() => {
@@ -45,9 +46,22 @@ export function Topbar() {
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-line bg-surface px-4 md:px-6">
-      <div>
-        <h1 className="text-[16px] font-bold text-txt">{title}</h1>
-        <p className="hidden text-[12px] text-muted sm:block first-letter:uppercase">{todayLabel || '\u00a0'}</p>
+      <div className="flex min-w-0 items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setMobileNavOpen(true)}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-green text-white md:hidden cursor-pointer"
+          aria-label="Menu openen"
+        >
+          <Leaf size={17} strokeWidth={2} />
+        </button>
+        <div className="min-w-0">
+          <h1 className="truncate text-[16px] font-bold text-txt max-md:hidden">{title}</h1>
+          <p className="hidden text-[16px] font-bold tracking-tight text-txt md:hidden">FLOW</p>
+          <p className="hidden text-[12px] text-muted sm:block first-letter:uppercase">
+            {todayLabel || '\u00a0'}
+          </p>
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <Tooltip content="Inspiratie (⌘I)">
@@ -73,7 +87,7 @@ export function Topbar() {
         </Tooltip>
         <Button variant="primary" size="md" onClick={() => setNewTaskOpen(true)}>
           <Plus size={16} strokeWidth={2} />
-          Nieuwe taak
+          <span className="hidden sm:inline">Nieuwe taak</span>
         </Button>
       </div>
     </header>

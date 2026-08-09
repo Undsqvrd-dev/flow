@@ -102,6 +102,7 @@ export interface PomodoroSession {
 
 export interface Settings {
   mantra: string;
+  affirmation: string;
   theme: 'light' | 'dark' | 'system';
   pomodoroFocusMin: number;      // 25
   pomodoroBreakMin: number;      // 5
@@ -124,6 +125,7 @@ export const DEFAULT_LABELS: LabelDef[] = [
 
 export const DEFAULT_SETTINGS: Settings = {
   mantra: 'Bouw iets dat er vandaag toe doet.',
+  affirmation: 'Ik focus op wat vandaag telt.',
   theme: 'system',
   pomodoroFocusMin: 25,
   pomodoroBreakMin: 5,

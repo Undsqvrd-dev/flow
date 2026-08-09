@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { MantraCard } from './MantraCard';
+import { QuoteAffirmationBlock } from './QuoteAffirmationBlock';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import type { MoodboardImage } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -21,8 +21,8 @@ function PhotoTile({ img }: { img: MoodboardImage }) {
 
 /**
  * Max 3 fototegels.
- * 0–1 foto: quote vult de rest van de rij.
- * 2–3 foto’s: alleen fototegels op de rij, quote eronder.
+ * 0–1 foto: quote+affirmatie vullen de rest van de rij.
+ * 2–3 foto’s: foto’s op de rij, quote+affirmatie eronder.
  */
 export function MoodQuoteRow() {
   const images = useSettingsStore((s) => s.settings.moodboardImages).slice(0, 3);
@@ -45,15 +45,13 @@ export function MoodQuoteRow() {
         ))}
 
         {quoteBeside && (
-          <div className={cn('min-h-[180px]', count === 1 && 'sm:col-span-2')}>
-            <div className="h-full">
-              <MantraCard fill />
-            </div>
+          <div className={cn('h-full min-h-[180px]', count === 1 && 'sm:col-span-2')}>
+            <QuoteAffirmationBlock fill />
           </div>
         )}
       </div>
 
-      {!quoteBeside && <MantraCard />}
+      {!quoteBeside && <QuoteAffirmationBlock />}
     </div>
   );
 }

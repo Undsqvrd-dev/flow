@@ -4,29 +4,13 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent }
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  LayoutDashboard, Columns3, Timer, Inbox, Target, Dumbbell, BarChart3, Settings,
-  Sun, Moon, Monitor, Leaf, PanelLeftClose, PanelLeftOpen,
+  LayoutDashboard, Sun, Moon, Monitor, Leaf, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useUiStore } from '@/stores/useUiStore';
+import { ALGEMEEN, MENU, NAV_ITEMS } from '@/components/shell/nav';
 import { cn } from '@/lib/utils';
-
-const MENU = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/board', label: 'Weekbord', icon: Columns3 },
-  { href: '/focus', label: 'Timer', icon: Timer },
-  { href: '/dump', label: 'Inspiratie', icon: Inbox },
-  { href: '/goals', label: 'Doelen', icon: Target },
-  { href: '/sport', label: 'Sport', icon: Dumbbell },
-];
-
-const ALGEMEEN = [
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/settings', label: 'Instellingen', icon: Settings },
-];
-
-const NAV_ITEMS = [...MENU, ...ALGEMEEN];
 
 function NavItem({ href, label, icon: Icon, active, tabIndex, itemRef, collapsed }: {
   href: string;

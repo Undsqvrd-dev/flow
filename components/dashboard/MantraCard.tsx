@@ -13,8 +13,8 @@ export function MantraCard({ fill = false }: { fill?: boolean }) {
   return (
     <div
       className={cn(
-        'rounded-panel border border-line bg-surface p-6 text-center shadow-soft-sm md:p-8',
-        fill && 'flex h-full min-h-[180px] flex-col items-center justify-center',
+        'flex w-full flex-col items-center justify-center rounded-panel border border-line bg-surface p-6 text-center shadow-soft-sm md:p-8',
+        fill ? 'h-full min-h-[180px]' : 'min-h-[180px]',
       )}
     >
       <p className="text-[20px] font-bold leading-snug tracking-tight text-txt md:text-[26px]">

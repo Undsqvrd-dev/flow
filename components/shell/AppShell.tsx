@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { MobileNav } from './MobileNav';
+import { MobileMenu } from './MobileMenu';
 import { GlobalHotkeys } from './GlobalHotkeys';
 import { NewTaskDialog } from './NewTaskDialog';
 import { QuickCapture } from './QuickCapture';
@@ -36,11 +36,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
-        <main className="min-h-0 flex-1 overflow-y-auto pb-16 md:pb-0">
+        <main className="min-h-0 flex-1 overflow-y-auto">
           {ready ? children : null}
         </main>
       </div>
-      <MobileNav />
+      <MobileMenu />
       {ready && (
         <>
           <GlobalHotkeys />

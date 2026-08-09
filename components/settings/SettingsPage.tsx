@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Plus, Trash2, Upload, Volume2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Input, Textarea } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { useSettingsStore } from '@/stores/useSettingsStore';
@@ -184,6 +184,15 @@ export function SettingsPage() {
       <div className="flex flex-col gap-4">
         <Panel title="Mantra">
           <Input value={settings.mantra} onChange={(e) => update({ mantra: e.target.value })} />
+        </Panel>
+
+        <Panel title="Affirmatie">
+          <Textarea
+            value={settings.affirmation}
+            onChange={(e) => update({ affirmation: e.target.value })}
+            placeholder="Affirmatie… (Enter voor nieuwe regel)"
+            rows={4}
+          />
         </Panel>
 
         <Panel title="Pomodoro">
