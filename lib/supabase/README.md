@@ -1,23 +1,45 @@
-# Supabase-koppeling (nog niet actief)
+# Supabase-koppeling
 
-FLOW draait nu volledig lokaal: alle data staat in `localStorage` via Zustand
-`persist` (sleutels `flow-*`). Deze map bevat alles om later naar Supabase te
-schakelen zonder het datamodel te wijzigen.
+FLOW gebruikt Supabase voor **auth** (magic link). Data staat nog in localStorage via
+Zustand `persist` — de database-koppeling per store volgt in een volgende stap.
 
-## Stappen om te koppelen
+## Supabase-dashboard instellen
 
-1. Maak een project op [supabase.com](https://supabase.com).
-2. Voer [`supabase/migrations/001_init.sql`](../../supabase/migrations/001_init.sql) uit in het SQL-paneel.
-3. Zet in Authentication → Providers alleen **Email (magic link)** aan en beperk
-   registratie: Authentication → Settings → "Disable new user signups" ná je
-   eerste eigen login (whitelist van één account).
-4. Kopieer `.env.example` naar `.env.local` en vul de waarden in.
-5. `npm install @supabase/supabase-js @supabase/ssr`
-6. Vervang de Zustand-persist-laag per store door TanStack Query-hooks op deze
-   client (optimistic updates met rollback). De veldnamen in `lib/types.ts`
-   mappen 1-op-1 op de kolommen (camelCase ↔ snake_case).
+### Authentication → URL Configuration
+
+| Veld | Waarde |
+|---|---|
+| **Site URL** | `https://flow-ecru-three.vercel.app` |
+| **Redirect URLs** | `https://flow-ecru-three.vercel.app/**` |
+| | `http://localhost:3000/**` |
+
+### Authentication → Providers
+
+- **Email** aan, magic link (geen wachtwoord)
+- Na je eerste login: **Disable new user signups**
+
+### Environment variables
+
+Lokaal (`.env.local`) en in Vercel (Production + Preview):
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://jouw-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...   # anon public key
+```
 
 ## Bestanden
 
-- `client.ts` — browserclient (te activeren na `npm install @supabase/ssr`)
+- `client.ts` — browserclient
 - `server.ts` — serverclient voor Server Components
+- `middleware.ts` — sessie vernieuwen + routebescherming
+
+## Login-flow
+
+1. `/login` — e-mail invoeren → magic link
+2. `/auth/callback` — token/code verwerken → door naar `/dashboard`
+3. Middleware stuurt niet-ingelogde bezoekers naar `/login`
+
+## Database (volgende stap)
+
+Schema staat in [`supabase/migrations/001_init.sql`](../../supabase/migrations/001_init.sql).
+Zodra stores naar Supabase schrijven: TanStack Query + optimistic updates.

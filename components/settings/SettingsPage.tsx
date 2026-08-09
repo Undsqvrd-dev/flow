@@ -12,6 +12,7 @@ import { useAlarm } from '@/lib/useAlarm';
 import { importTrello, type TrelloExport } from '@/lib/importTrello';
 import { GOAL_COLOR_PALETTE } from '@/lib/labels';
 import { uid, cn } from '@/lib/utils';
+import { SignOutButton } from '@/components/auth/SignOutButton';
 import type { Settings } from '@/lib/types';
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
@@ -246,6 +247,13 @@ export function SettingsPage() {
 
         <Panel title="Migratie">
           <TrelloImport />
+        </Panel>
+
+        <Panel title="Account">
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-[13px] text-muted">Je bent ingelogd via magic link.</span>
+            <SignOutButton />
+          </div>
         </Panel>
       </div>
     </div>
