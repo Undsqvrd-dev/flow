@@ -13,6 +13,7 @@ import { importTrello, type TrelloExport } from '@/lib/importTrello';
 import { GOAL_COLOR_PALETTE } from '@/lib/labels';
 import { uid, cn } from '@/lib/utils';
 import { SignOutButton } from '@/components/auth/SignOutButton';
+import { MoodboardEditor } from '@/components/settings/MoodboardEditor';
 import type { Settings } from '@/lib/types';
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
@@ -245,13 +246,17 @@ export function SettingsPage() {
           <NumberField label="Weekdoel (sessies)" value={settings.sportWeeklyTarget} onChange={(v) => update({ sportWeeklyTarget: v })} />
         </Panel>
 
+        <Panel title="Droomleven / moodboard">
+          <MoodboardEditor />
+        </Panel>
+
         <Panel title="Migratie">
           <TrelloImport />
         </Panel>
 
         <Panel title="Account">
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[13px] text-muted">Je bent ingelogd via magic link.</span>
+            <span className="text-[13px] text-muted">Je bent ingelogd met e-mail en wachtwoord.</span>
             <SignOutButton />
           </div>
         </Panel>

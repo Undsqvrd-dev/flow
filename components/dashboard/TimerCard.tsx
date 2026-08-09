@@ -7,7 +7,7 @@ import { useTicker, formatClock } from '@/lib/useTicker';
 import { todayISO } from '@/lib/dates';
 import { formatMinutes } from '@/lib/utils';
 
-/** Donkergroene timerkaart — groter, prominenter op het dashboard. */
+/** Compacte timer rechtsboven op het dashboard. */
 export function TimerCard() {
   const store = usePomodoroStore();
   const running = store.phase === 'running';
@@ -19,52 +19,58 @@ export function TimerCard() {
   const focusedToday = focusMinutesBetween(store.sessions, todayStart, todayEnd);
 
   return (
-    <div className="flex h-full min-h-[280px] flex-col rounded-panel bg-green-900 p-6 text-white shadow-soft">
-      <p className="panel-label inline-flex items-center gap-1.5 !text-green-200 dark:!text-green-400">
+    <div className="flex h-full min-h-[120px] flex-col justify-between rounded-panel bg-green-900 p-4 text-white shadow-soft sm:p-5">
+      <p className="panel-label inline-flex items-center gap-1.5 !mb-0 !text-green-200 dark:!text-green-400">
         <Timer size={13} strokeWidth={2} /> Timer
       </p>
+
       {store.phase !== 'idle' ? (
-        <>
-          <p className="mt-6 text-[48px] font-bold tabular-nums leading-none tracking-tight">
-            {formatClock(msLeft)}
-          </p>
-          <p className="mt-2 text-[12px] uppercase tracking-[.06em] text-green-200 dark:text-green-400">
-            {store.mode === 'focus' ? 'Focus' : 'Pauze'}{store.phase === 'paused' && ' · gepauzeerd'}
-          </p>
-          <div className="mt-auto flex gap-2 pt-6">
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[32px] font-bold tabular-nums leading-none tracking-tight">
+              {formatClock(msLeft)}
+            </p>
+            <p className="mt-1 text-[11px] uppercase tracking-[.06em] text-green-200 dark:text-green-400">
+              {store.mode === 'focus' ? 'Focus' : 'Pauze'}
+              {store.phase === 'paused' && ' · gepauzeerd'}
+            </p>
+          </div>
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={() => (running ? store.pause() : store.resume())}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-pill bg-green py-3 text-[13px] font-semibold hover:brightness-110 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-pill bg-green px-3 py-2 text-[12px] font-semibold hover:brightness-110 cursor-pointer"
             >
-              {running ? <Pause size={15} strokeWidth={2} /> : <Play size={15} strokeWidth={2} />}
+              {running ? <Pause size={14} strokeWidth={2} /> : <Play size={14} strokeWidth={2} />}
               {running ? 'Pauze' : 'Verder'}
             </button>
             <button
               type="button"
               onClick={() => store.stop(false)}
-              className="flex items-center justify-center rounded-pill border border-white/25 px-4 hover:bg-white/10 cursor-pointer"
+              className="inline-flex items-center justify-center rounded-pill border border-white/25 px-3 py-2 hover:bg-white/10 cursor-pointer"
               aria-label="Stop"
             >
-              <Square size={15} strokeWidth={2} />
+              <Square size={14} strokeWidth={2} />
             </button>
           </div>
-        </>
+        </div>
       ) : (
-        <>
-          <p className="mt-6 text-[36px] font-bold leading-tight tracking-tight">
-            {focusedToday > 0 ? formatMinutes(focusedToday) : 'Nog geen focus'}
-          </p>
-          <p className="mt-2 text-[13px] text-green-200 dark:text-green-400">
-            {focusedToday > 0 ? 'gefocust vandaag' : 'vandaag'}
-          </p>
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[22px] font-bold leading-tight tracking-tight">
+              {focusedToday > 0 ? formatMinutes(focusedToday) : 'Start focus'}
+            </p>
+            <p className="mt-1 text-[12px] text-green-200 dark:text-green-400">
+              {focusedToday > 0 ? 'gefocust vandaag' : 'pomodoro-sessie'}
+            </p>
+          </div>
           <Link
             href="/focus"
-            className="mt-auto inline-flex items-center justify-center gap-1.5 rounded-pill border border-white/25 py-3 text-[13px] font-medium hover:bg-white/10"
+            className="inline-flex items-center gap-1.5 rounded-pill border border-white/25 px-3 py-2 text-[12px] font-medium hover:bg-white/10"
           >
-            <Play size={14} strokeWidth={2} /> Start pomodoro
+            <Play size={14} strokeWidth={2} /> Start
           </Link>
-        </>
+        </div>
       )}
     </div>
   );

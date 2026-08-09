@@ -65,7 +65,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'flow-settings',
-      version: 1,
+      version: 2,
       migrate: (persisted) => {
         const state = persisted as { settings: Settings };
         return {
@@ -73,6 +73,7 @@ export const useSettingsStore = create<SettingsState>()(
             ...DEFAULT_SETTINGS,
             ...state.settings,
             labels: state.settings?.labels?.length ? state.settings.labels : DEFAULT_LABELS,
+            moodboardImages: state.settings?.moodboardImages ?? [],
           },
         };
       },

@@ -68,6 +68,12 @@ export interface LabelDef {
   color: string;
 }
 
+export interface MoodboardImage {
+  id: string;
+  path: string;
+  url: string;
+}
+
 /** @deprecated Dumpbak gebruikt nu echte Task-kaarten (dayKey dump/wachtruimte). */
 export interface Idea {
   id: string;
@@ -107,6 +113,7 @@ export interface Settings {
   showPriorityBadges: boolean;   // kwadrantlabels op kaarten aan/uit — default aan
   askDayFocusOnOpen: boolean;    // ochtendvraag — default aan
   labels: LabelDef[];            // zelf gedefinieerde labels met kleur
+  moodboardImages: MoodboardImage[];
 }
 
 export const DEFAULT_LABELS: LabelDef[] = [
@@ -128,6 +135,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showPriorityBadges: true,
   askDayFocusOnOpen: true,
   labels: DEFAULT_LABELS,
+  moodboardImages: [],
 };
 
 /** Statische fallbacklabels; UI gebruikt `horizonLabel()` uit dates.ts voor de actuele periode. */

@@ -3,11 +3,9 @@
 import Link from 'next/link';
 import { Plus, Columns3 } from 'lucide-react';
 import { StatRow } from './StatRow';
-import { DayFocusCard } from './DayFocusCard';
 import { WeekTargetCard } from './WeekTargetCard';
-import { GoalsPanel } from './GoalsPanel';
 import { TimerCard } from './TimerCard';
-import { MantraCard } from './MantraCard';
+import { MoodQuoteRow } from './MoodQuoteRow';
 import { SportPanel } from '@/components/sport/SportWidgets';
 import { Button } from '@/components/ui/button';
 import { useUiStore } from '@/stores/useUiStore';
@@ -34,23 +32,18 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <StatRow />
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <WeekTargetCard />
-        </div>
-        <DayFocusCard />
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <SportPanel />
-        <GoalsPanel />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatRow />
         <TimerCard />
       </div>
 
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <WeekTargetCard />
+        <SportPanel />
+      </div>
+
       <div className="mt-4">
-        <MantraCard />
+        <MoodQuoteRow />
       </div>
     </div>
   );

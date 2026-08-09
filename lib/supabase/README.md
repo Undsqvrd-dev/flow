@@ -25,7 +25,7 @@ Zustand blijft de UI-bron; Supabase is de bron van waarheid na login.
 Lokaal (`.env.local`) en in Vercel (Production + Preview) — **elke key apart, alleen de waarde**:
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://oxtgcgwottraqsblfsmmf.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://oxtgcgwottrqsblfsmmf.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 ```
 
@@ -33,6 +33,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 
 1. `supabase/migrations/001_init.sql` (al gedaan)
 2. `supabase/migrations/002_schema_sync.sql` — horizon + values
+3. `supabase/migrations/003_moodboard_storage.sql` — foto-bucket moodboard
 
 ## Bestanden
 

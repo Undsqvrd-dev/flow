@@ -135,11 +135,12 @@ export function activeGoals(goals: Goal[]): Goal[] {
 }
 
 /**
- * Hoofdtarget: eerste actieve maanddoel met een targetwaarde (op rank).
- * Wordt getoond op dashboard en weekbord.
+ * Hoofd-maandoel: eerste actieve maanddoel (op rank).
+ * Heeft voorkeur voor een doel met targetwaarde; anders het eerste maanddoel.
  */
 export function mainMonthTarget(goals: Goal[]): Goal | undefined {
-  return activeGoals(goals).find(
-    (g) => g.horizon === 'maand' && g.targetValue !== null && g.targetValue > 0,
+  const month = activeGoals(goals).filter((g) => g.horizon === 'maand');
+  return (
+    month.find((g) => g.targetValue !== null && g.targetValue > 0) ?? month[0]
   );
 }
