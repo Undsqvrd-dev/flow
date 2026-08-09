@@ -1,9 +1,16 @@
 # Supabase-koppeling
 
-FLOW gebruikt Supabase voor **auth** (magic link). Data staat nog in localStorage via
-Zustand `persist` — de database-koppeling per store volgt in een volgende stap.
+FLOW gebruikt Supabase voor **auth** (e-mail + wachtwoord) en **data** (taken, doelen, enz.).
+Zustand blijft de UI-bron; Supabase is de bron van waarheid na login.
 
-## Supabase-dashboard instellen
+## Supabase-dashboard (eenmalig)
+
+### Authentication → Providers → Email
+
+- Email provider **aan**
+- Password sign-ins **aan**
+- Magic link mag uit
+- Maak/zet een wachtwoord voor je user (Authentication → Users)
 
 ### Authentication → URL Configuration
 
@@ -13,33 +20,28 @@ Zustand `persist` — de database-koppeling per store volgt in een volgende stap
 | **Redirect URLs** | `https://flow-ecru-three.vercel.app/**` |
 | | `http://localhost:3000/**` |
 
-### Authentication → Providers
-
-- **Email** aan, magic link (geen wachtwoord)
-- Na je eerste login: **Disable new user signups**
-
 ### Environment variables
 
-Lokaal (`.env.local`) en in Vercel (Production + Preview):
+Lokaal (`.env.local`) en in Vercel (Production + Preview) — **elke key apart, alleen de waarde**:
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://jouw-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...   # anon public key
+NEXT_PUBLIC_SUPABASE_URL=https://oxtgcgwottraqsblfsmmf.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 ```
+
+### Schema
+
+1. `supabase/migrations/001_init.sql` (al gedaan)
+2. `supabase/migrations/002_schema_sync.sql` — horizon + values
 
 ## Bestanden
 
-- `client.ts` — browserclient
-- `server.ts` — serverclient voor Server Components
-- `middleware.ts` — sessie vernieuwen + routebescherming
+- `client.ts` / `server.ts` / `middleware.ts` / `env.ts` — clients + routebescherming
+- `mappers.ts` — camelCase ↔ snake_case
+- `../db/*` — load/upsert/bootstrap
 
 ## Login-flow
 
-1. `/login` — e-mail invoeren → magic link
-2. `/auth/callback` — token/code verwerken → door naar `/dashboard`
-3. Middleware stuurt niet-ingelogde bezoekers naar `/login`
-
-## Database (volgende stap)
-
-Schema staat in [`supabase/migrations/001_init.sql`](../../supabase/migrations/001_init.sql).
-Zodra stores naar Supabase schrijven: TanStack Query + optimistic updates.
+1. `/login` — e-mail + wachtwoord
+2. Middleware stuurt niet-ingelogde bezoekers naar `/login`
+3. Na login: bootstrap laadt remote data; lege DB + lokale data → eenmalige migratie

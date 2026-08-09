@@ -8,18 +8,27 @@ import { GlobalHotkeys } from './GlobalHotkeys';
 import { NewTaskDialog } from './NewTaskDialog';
 import { QuickCapture } from './QuickCapture';
 import { CardModal } from '@/components/card/CardModal';
+import { bootstrapData } from '@/lib/db/bootstrap';
 import { useBoardStore } from '@/stores/useBoardStore';
 
 /**
- * Client-shell: wacht tot de persistente stores gehydrateerd zijn
- * (localStorage) en draait daarna eenmalig de weekrollover.
+ * Client-shell: wacht tot stores + Supabase-bootstrap klaar zijn,
+ * daarna weekrollover.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    useBoardStore.getState().rollover();
-    setReady(true);
+    let cancelled = false;
+    void (async () => {
+      await bootstrapData();
+      if (cancelled) return;
+      useBoardStore.getState().rollover();
+      setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

@@ -32,7 +32,7 @@ Zustand (persist) · Framer Motion · Recharts · date-fns (`nl`) · next-themes
 
 ## Data
 
-Alle data staat nu **lokaal in de browser** (localStorage, sleutels `flow-*`).
-Het Supabase-schema staat klaar in [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql);
-zie [`lib/supabase/README.md`](lib/supabase/README.md) voor de koppelstappen
-zodra je naar Vercel + Supabase gaat.
+Na login is **Supabase** de bron van waarheid. Zustand cache’t lokaal (`flow-*`).
+Schema: [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) +
+[`002_schema_sync.sql`](supabase/migrations/002_schema_sync.sql).
+Setup: [`lib/supabase/README.md`](lib/supabase/README.md).

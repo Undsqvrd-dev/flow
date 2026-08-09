@@ -5,6 +5,7 @@ import { persist } from 'zustand/middleware';
 import type { Focus } from '@/lib/types';
 import { todayISO, weekOf } from '@/lib/dates';
 import { uid } from '@/lib/utils';
+import { syncFocuses } from '@/lib/db/storeSync';
 
 interface FocusState {
   focuses: Focus[];
@@ -47,9 +48,15 @@ function upsert(focuses: Focus[], week: string, patch: Partial<Focus>): Focus[] 
   return [...focuses.filter((f) => f.weekOf !== week), updated];
 }
 
+function syncWeek(prev: Focus[], next: Focus[]): void {
+  const week = weekOf();
+  const updated = next.find((f) => f.weekOf === week);
+  if (updated) syncFocuses([updated], () => useFocusStore.setState({ focuses: prev }));
+}
+
 export const useFocusStore = create<FocusState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       focuses: [],
       barExpanded: false,
       lensFocusGoal: false,
@@ -69,38 +76,41 @@ export const useFocusStore = create<FocusState>()(
         ),
       markVisitedToday: () => set({ lastVisitDate: todayISO() }),
 
-      setWeekFocus: (patch) =>
-        set((s) => ({ focuses: upsert(s.focuses, weekOf(), patch) })),
+      setWeekFocus: (patch) => {
+        const prev = get().focuses;
+        const next = upsert(prev, weekOf(), patch);
+        set({ focuses: next });
+        syncWeek(prev, next);
+      },
 
       setDayFocus: (note) => {
         const trimmed = note.trim();
-        if (!trimmed) {
-          set((s) => ({
-            focuses: upsert(s.focuses, weekOf(), {
+        const prev = get().focuses;
+        const next = trimmed
+          ? upsert(prev, weekOf(), {
+              dayFocusTaskId: null,
+              dayFocusNote: trimmed,
+              dayFocusDate: todayISO(),
+            })
+          : upsert(prev, weekOf(), {
               dayFocusTaskId: null,
               dayFocusNote: null,
               dayFocusDate: null,
-            }),
-          }));
-          return;
-        }
-        set((s) => ({
-          focuses: upsert(s.focuses, weekOf(), {
-            dayFocusTaskId: null,
-            dayFocusNote: trimmed,
-            dayFocusDate: todayISO(),
-          }),
-        }));
+            });
+        set({ focuses: next });
+        syncWeek(prev, next);
       },
 
-      clearDayFocus: () =>
-        set((s) => ({
-          focuses: upsert(s.focuses, weekOf(), {
-            dayFocusTaskId: null,
-            dayFocusNote: null,
-            dayFocusDate: null,
-          }),
-        })),
+      clearDayFocus: () => {
+        const prev = get().focuses;
+        const next = upsert(prev, weekOf(), {
+          dayFocusTaskId: null,
+          dayFocusNote: null,
+          dayFocusDate: null,
+        });
+        set({ focuses: next });
+        syncWeek(prev, next);
+      },
     }),
     { name: 'flow-focus' },
   ),

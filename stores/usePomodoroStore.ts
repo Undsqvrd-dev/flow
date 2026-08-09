@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { PomodoroSession } from '@/lib/types';
 import { uid } from '@/lib/utils';
+import { syncPomodoro } from '@/lib/db/storeSync';
 
 export type TimerPhase = 'idle' | 'running' | 'paused';
 export type TimerMode = 'focus' | 'pauze';
@@ -70,6 +71,7 @@ export const usePomodoroStore = create<PomodoroState>()(
       stop: (completed) => {
         const s = get();
         if (s.phase === 'idle') return;
+        const prevSessions = s.sessions;
         const plannedMs = s.plannedMin * 60_000;
         const leftMs = s.phase === 'paused' ? (s.remainingMs ?? 0) : Math.max(0, (s.endsAt ?? 0) - Date.now());
         const actualMin = Math.round((plannedMs - leftMs) / 60_000);
@@ -91,8 +93,9 @@ export const usePomodoroStore = create<PomodoroState>()(
           startedAtISO: null,
           batchTaskIds: [],
           roundsCompleted: rounds,
-          sessions: [...s.sessions, session],
+          sessions: [...prevSessions, session],
         });
+        syncPomodoro([session], () => set({ sessions: prevSessions }));
       },
 
       setTask: (taskId) => set({ taskId }),

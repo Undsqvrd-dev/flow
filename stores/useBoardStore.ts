@@ -13,6 +13,15 @@ import {
 } from '@/lib/dates';
 import { nextRank, RANK_STEP, uid } from '@/lib/utils';
 import { QUADRANT_ORDER, quadrant, type Quadrant } from '@/lib/priority';
+import { setQuickWinBundleCache } from '@/lib/db/bundleCache';
+import {
+  syncDayStates,
+  syncRemoveTask,
+  syncRemoveTasks,
+  syncSettingsData,
+  syncTasks,
+} from '@/lib/db/storeSync';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 export interface NewTaskInput {
   title: string;
@@ -133,24 +142,34 @@ export const useBoardStore = create<BoardState>()(
         const dayKey = input.dayKey ?? 'algemeen';
         const daypart = input.daypart ?? null;
         const columnWeek = input.weekOf ?? weekOf();
-        const siblings = get().tasks.filter((t) =>
+        const prev = get().tasks;
+        const siblings = prev.filter((t) =>
           sameSection(t, dayKey, daypart, isBoardDayKey(dayKey) ? columnWeek : undefined),
         );
         const task = makeTask(input, siblings.map((t) => t.rank));
-        set((s) => ({ tasks: [...s.tasks, task] }));
+        set({ tasks: [...prev, task] });
+        syncTasks([task], () => set({ tasks: prev }));
         return task;
       },
 
-      updateTask: (id, patch) =>
-        set((s) => ({
-          tasks: s.tasks.map((t) => (t.id === id ? touch({ ...t, ...patch }) : t)),
-        })),
+      updateTask: (id, patch) => {
+        const prev = get().tasks;
+        const next = prev.map((t) => (t.id === id ? touch({ ...t, ...patch }) : t));
+        set({ tasks: next });
+        const updated = next.find((t) => t.id === id);
+        if (updated) syncTasks([updated], () => set({ tasks: prev }));
+      },
 
-      removeTask: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
+      removeTask: (id) => {
+        const prev = get().tasks;
+        set({ tasks: prev.filter((t) => t.id !== id) });
+        syncRemoveTask(id, () => set({ tasks: prev }));
+      },
 
       duplicateTask: (id) => {
         const src = get().tasks.find((t) => t.id === id);
         if (!src) return;
+        const prev = get().tasks;
         const now = new Date().toISOString();
         const copy: Task = {
           ...src,
@@ -164,26 +183,31 @@ export const useBoardStore = create<BoardState>()(
           createdAt: now,
           updatedAt: now,
         };
-        set((s) => ({ tasks: [...s.tasks, copy] }));
+        set({ tasks: [...prev, copy] });
+        syncTasks([copy], () => set({ tasks: prev }));
       },
 
-      toggleDone: (id) =>
-        set((s) => ({
-          tasks: s.tasks.map((t) =>
-            t.id === id
-              ? touch({
-                  ...t,
-                  done: !t.done,
-                  completedAt: !t.done ? new Date().toISOString() : null,
-                })
-              : t,
-          ),
-        })),
+      toggleDone: (id) => {
+        const prev = get().tasks;
+        const next = prev.map((t) =>
+          t.id === id
+            ? touch({
+                ...t,
+                done: !t.done,
+                completedAt: !t.done ? new Date().toISOString() : null,
+              })
+            : t,
+        );
+        set({ tasks: next });
+        const updated = next.find((t) => t.id === id);
+        if (updated) syncTasks([updated], () => set({ tasks: prev }));
+      },
 
       moveTask: (id, dayKey, daypart, index, targetWeekOf) => {
         const state = get();
         const task = state.tasks.find((t) => t.id === id);
         if (!task) return;
+        const prev = state.tasks;
         const week = targetWeekOf ?? weekOf();
         const siblings = state.tasks
           .filter(
@@ -209,9 +233,12 @@ export const useBoardStore = create<BoardState>()(
               : {}),
           });
         });
-        set((s) => ({
-          tasks: s.tasks.map((t) => (patches.has(t.id) ? touch({ ...t, ...patches.get(t.id) }) : t)),
-        }));
+        const next = prev.map((t) =>
+          patches.has(t.id) ? touch({ ...t, ...patches.get(t.id) }) : t,
+        );
+        set({ tasks: next });
+        const changed = next.filter((t) => patches.has(t.id));
+        syncTasks(changed, () => set({ tasks: prev }));
       },
 
       moveRank: (id, direction) => {
@@ -236,13 +263,17 @@ export const useBoardStore = create<BoardState>()(
 
         if (j >= 0 && j < section.length) {
           const other = section[j];
-          set((s) => ({
-            tasks: s.tasks.map((t) => {
-              if (t.id === task.id) return touch({ ...t, rank: other.rank });
-              if (t.id === other.id) return touch({ ...t, rank: task.rank });
-              return t;
-            }),
-          }));
+          const prev = state.tasks;
+          const next = prev.map((t) => {
+            if (t.id === task.id) return touch({ ...t, rank: other.rank });
+            if (t.id === other.id) return touch({ ...t, rank: task.rank });
+            return t;
+          });
+          set({ tasks: next });
+          syncTasks(
+            next.filter((t) => t.id === task.id || t.id === other.id),
+            () => set({ tasks: prev }),
+          );
           return;
         }
 
@@ -288,84 +319,117 @@ export const useBoardStore = create<BoardState>()(
           });
           [...rated, ...unrated].forEach((t, i) => patches.set(t.id, (i + 1) * RANK_STEP));
         }
-        set((s) => ({
-          tasks: s.tasks.map((t) =>
-            patches.has(t.id) ? touch({ ...t, rank: patches.get(t.id) as number }) : t,
-          ),
-        }));
+        const prev = state.tasks;
+        const next = prev.map((t) =>
+          patches.has(t.id) ? touch({ ...t, rank: patches.get(t.id) as number }) : t,
+        );
+        set({ tasks: next });
+        syncTasks(
+          next.filter((t) => patches.has(t.id)),
+          () => set({ tasks: prev }),
+        );
       },
 
       moveAllToTomorrow: (dateISO) => {
         const d = parseISO(dateISO);
         const fromKey = dayKeyFromDate(d);
         const fromWeek = weekOf(d);
-        const next = nextCalendarDay(dateISO);
-        set((s) => ({
-          tasks: s.tasks.map((t) =>
-            !t.done && t.dayKey === fromKey && t.weekOf === fromWeek
-              ? touch({ ...t, dayKey: next.dayKey, weekOf: next.weekOf })
-              : t,
-          ),
-        }));
+        const nextDay = nextCalendarDay(dateISO);
+        const prev = get().tasks;
+        const next = prev.map((t) =>
+          !t.done && t.dayKey === fromKey && t.weekOf === fromWeek
+            ? touch({ ...t, dayKey: nextDay.dayKey, weekOf: nextDay.weekOf })
+            : t,
+        );
+        set({ tasks: next });
+        syncTasks(
+          next.filter((t, i) => t !== prev[i]),
+          () => set({ tasks: prev }),
+        );
       },
 
-      clearColumn: (dayKey, columnWeekOf) =>
-        set((s) => ({
-          tasks: s.tasks.filter((t) => {
-            if (t.done || t.dayKey !== dayKey) return true;
-            if (isBoardDayKey(dayKey) && columnWeekOf) return t.weekOf !== columnWeekOf;
-            return false;
-          }),
-        })),
+      clearColumn: (dayKey, columnWeekOf) => {
+        const prev = get().tasks;
+        const removed = prev.filter((t) => {
+          if (t.done || t.dayKey !== dayKey) return false;
+          if (isBoardDayKey(dayKey) && columnWeekOf) return t.weekOf === columnWeekOf;
+          return true;
+        });
+        const next = prev.filter((t) => !removed.includes(t));
+        set({ tasks: next });
+        syncRemoveTasks(
+          removed.map((t) => t.id),
+          () => set({ tasks: prev }),
+        );
+      },
 
-      closeDay: (date, reflection = null) =>
-        set((s) => ({
-          dayStates: [
-            ...s.dayStates.filter((d) => d.date !== date),
-            { date, closed: true, closedAt: new Date().toISOString(), reflection },
-          ],
-        })),
+      closeDay: (date, reflection = null) => {
+        const prev = get().dayStates;
+        const state = {
+          date,
+          closed: true,
+          closedAt: new Date().toISOString(),
+          reflection,
+        };
+        set({ dayStates: [...prev.filter((d) => d.date !== date), state] });
+        syncDayStates([state], () => set({ dayStates: prev }));
+      },
 
-      reopenDay: (date) =>
-        set((s) => ({
-          dayStates: s.dayStates.map((d) =>
-            d.date === date ? { ...d, closed: false, closedAt: null } : d,
-          ),
-        })),
+      reopenDay: (date) => {
+        const prev = get().dayStates;
+        const next = prev.map((d) =>
+          d.date === date ? { ...d, closed: false, closedAt: null } : d,
+        );
+        set({ dayStates: next });
+        const updated = next.find((d) => d.date === date);
+        if (updated) syncDayStates([updated], () => set({ dayStates: prev }));
+      },
 
       enableQuickWinBundle: (dayKey, columnWeekOf) => {
         const key = quickWinBundleKey(dayKey, columnWeekOf ?? weekOf());
-        set((s) =>
-          s.quickWinBundles.includes(key)
-            ? s
-            : { quickWinBundles: [...s.quickWinBundles, key] },
-        );
+        const prev = get().quickWinBundles;
+        if (prev.includes(key)) return;
+        const next = [...prev, key];
+        set({ quickWinBundles: next });
+        setQuickWinBundleCache(next);
+        syncSettingsData(useSettingsStore.getState().settings, next, () => {
+          set({ quickWinBundles: prev });
+          setQuickWinBundleCache(prev);
+        });
       },
 
       disableQuickWinBundle: (dayKey, columnWeekOf) => {
         const key = quickWinBundleKey(dayKey, columnWeekOf ?? weekOf());
-        set((s) => ({ quickWinBundles: s.quickWinBundles.filter((k) => k !== key) }));
+        const prev = get().quickWinBundles;
+        const next = prev.filter((k) => k !== key);
+        set({ quickWinBundles: next });
+        setQuickWinBundleCache(next);
+        syncSettingsData(useSettingsStore.getState().settings, next, () => {
+          set({ quickWinBundles: prev });
+          setQuickWinBundleCache(prev);
+        });
       },
 
       rollover: () => {
         const current = weekOf();
-        set((s) => ({
-          tasks: s.tasks.map((t) => {
-            if (t.weekOf >= current) return t;
-            if (t.done) return t;
-            // Borddagen blijven sticky zichtbaar tot leeg.
-            if (isBoardDayKey(t.dayKey)) return t;
-            if (t.dayKey === 'algemeen') return { ...t, weekOf: current };
-            return touch({
-              ...t,
-              dayKey: 'algemeen',
-              daypart: null,
-              weekOf: current,
-              fromPreviousWeek: true,
-            });
-          }),
-          quickWinBundles: s.quickWinBundles,
-        }));
+        const prev = get().tasks;
+        const next = prev.map((t) => {
+          if (t.weekOf >= current) return t;
+          if (t.done) return t;
+          // Borddagen blijven sticky zichtbaar tot leeg.
+          if (isBoardDayKey(t.dayKey)) return t;
+          if (t.dayKey === 'algemeen') return { ...t, weekOf: current };
+          return touch({
+            ...t,
+            dayKey: 'algemeen',
+            daypart: null,
+            weekOf: current,
+            fromPreviousWeek: true,
+          });
+        });
+        set({ tasks: next });
+        const changed = next.filter((t, i) => t !== prev[i]);
+        if (changed.length) syncTasks(changed, () => set({ tasks: prev }));
       },
     }),
     {

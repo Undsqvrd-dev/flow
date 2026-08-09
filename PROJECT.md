@@ -17,8 +17,8 @@ vandaag telt.*
 | Weekfocus | Altijd zichtbaar in de sticky focusbalk; in-/uitklapbaar |
 | Dagafsluiten | Open taken blijven staan; geen auto-doorrollen |
 | Weekfocus verplicht | Nee — optioneel; maandag vraagt vriendelijk via de balk |
-| Datalaag (nu) | Lokaal: Zustand + `persist` (localStorage), sleutels `flow-*` |
-| Datalaag (later) | Supabase; schema staat klaar in `supabase/migrations/001_init.sql` |
+| Datalaag (nu) | Supabase (bron van waarheid) + Zustand cache (`flow-*` localStorage) |
+| Auth | E-mail + wachtwoord; zie `lib/supabase/README.md` |
 
 ## Ontwerpprincipes
 

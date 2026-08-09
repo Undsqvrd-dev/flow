@@ -6,6 +6,7 @@ import type { SportSession } from '@/lib/types';
 import { uid } from '@/lib/utils';
 import { weekOf } from '@/lib/dates';
 import { useGoalsStore } from './useGoalsStore';
+import { syncRemoveSport, syncSport } from '@/lib/db/storeSync';
 
 export interface NewSportSession {
   date: string;
@@ -34,6 +35,7 @@ export const useSportStore = create<SportState>()(
       sessions: [],
 
       logSession: (input) => {
+        const prev = get().sessions;
         const session: SportSession = {
           id: uid(),
           date: input.date,
@@ -42,13 +44,16 @@ export const useSportStore = create<SportState>()(
           intensity: input.intensity,
           note: input.note ?? null,
         };
-        set((s) => ({ sessions: [...s.sessions, session] }));
+        set({ sessions: [...prev, session] });
+        syncSport([session], () => set({ sessions: prev }));
         bumpLinkedGoal(1);
       },
 
       removeSession: (id) => {
-        const existed = get().sessions.some((s) => s.id === id);
-        set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) }));
+        const prev = get().sessions;
+        const existed = prev.some((s) => s.id === id);
+        set({ sessions: prev.filter((x) => x.id !== id) });
+        syncRemoveSport(id, () => set({ sessions: prev }));
         if (existed) bumpLinkedGoal(-1);
       },
     }),

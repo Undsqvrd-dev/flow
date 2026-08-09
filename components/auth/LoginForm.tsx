@@ -1,50 +1,63 @@
 'use client';
 
 import { useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createClient } from '@/lib/supabase/client';
 
+const supabaseConfigured =
+  Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()) &&
+  Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim());
+
 export function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const authError = searchParams.get('error') === 'auth';
 
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
+  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = email.trim();
-    if (!trimmed) return;
+    if (!trimmed || !password) return;
 
     setStatus('loading');
     setMessage(null);
 
-    const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/callback`;
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: trimmed,
+        password,
+      });
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email: trimmed,
-      options: { emailRedirectTo: redirectTo },
-    });
+      if (error) {
+        setStatus('error');
+        setMessage(
+          error.message === 'Invalid login credentials'
+            ? 'Onjuist e-mailadres of wachtwoord.'
+            : error.message,
+        );
+        return;
+      }
 
-    if (error) {
+      router.replace('/dashboard');
+      router.refresh();
+    } catch (err) {
       setStatus('error');
-      setMessage(error.message);
-      return;
+      setMessage(err instanceof Error ? err.message : 'Inloggen mislukt.');
     }
-
-    setStatus('sent');
-    setMessage('Check je inbox — klik op de link om in te loggen.');
   }
 
   return (
     <div className="w-full max-w-sm">
       <div className="mb-8 text-center">
         <h1 className="text-2xl font-semibold tracking-tight text-txt">FLOW</h1>
-        <p className="mt-2 text-sm text-muted">Log in met een magic link</p>
+        <p className="mt-2 text-sm text-muted">Log in met e-mail en wachtwoord</p>
       </div>
 
       <form
@@ -61,7 +74,21 @@ export function LoginForm() {
           placeholder="jij@voorbeeld.nl"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          disabled={status === 'loading' || status === 'sent'}
+          disabled={!supabaseConfigured || status === 'loading'}
+          className="mt-2"
+          required
+        />
+
+        <label className="mt-4 block text-[13px] font-medium text-txt-2" htmlFor="password">
+          Wachtwoord
+        </label>
+        <Input
+          id="password"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={!supabaseConfigured || status === 'loading'}
           className="mt-2"
           required
         />
@@ -70,10 +97,17 @@ export function LoginForm() {
           type="submit"
           variant="primary"
           className="mt-4 w-full"
-          disabled={status === 'loading' || status === 'sent'}
+          disabled={!supabaseConfigured || status === 'loading'}
         >
-          {status === 'loading' ? 'Versturen…' : 'Stuur magic link'}
+          {status === 'loading' ? 'Bezig…' : 'Inloggen'}
         </Button>
+
+        {!supabaseConfigured && (
+          <p className="mt-4 text-center text-[13px] text-red">
+            Supabase is niet geconfigureerd. Zet NEXT_PUBLIC_SUPABASE_URL en
+            NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel en redeploy.
+          </p>
+        )}
 
         {(message || authError) && (
           <p
@@ -81,9 +115,7 @@ export function LoginForm() {
               status === 'error' || authError ? 'text-red' : 'text-muted'
             }`}
           >
-            {authError && status === 'idle'
-              ? 'Inloggen mislukt. Vraag een nieuwe link aan.'
-              : message}
+            {authError && status === 'idle' ? 'Inloggen mislukt. Probeer opnieuw.' : message}
           </p>
         )}
       </form>

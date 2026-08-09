@@ -4,6 +4,12 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Goal, GoalHorizon, GoalScope, Value } from '@/lib/types';
 import { nextRank, uid } from '@/lib/utils';
+import {
+  syncGoals,
+  syncRemoveGoal,
+  syncRemoveValue,
+  syncValues,
+} from '@/lib/db/storeSync';
 
 export interface NewGoalInput {
   title: string;
@@ -49,26 +55,55 @@ export const useGoalsStore = create<GoalsState>()(
           active: true,
           rank: nextRank(get().goals.map((g) => g.rank)),
         };
+        const prev = get().goals;
         set((s) => ({ goals: [...s.goals, goal] }));
+        syncGoals([goal], () => set({ goals: prev }));
         return goal;
       },
-      updateGoal: (id, patch) =>
-        set((s) => ({ goals: s.goals.map((g) => (g.id === id ? { ...g, ...patch } : g)) })),
-      removeGoal: (id) => set((s) => ({ goals: s.goals.filter((g) => g.id !== id) })),
-      incrementGoal: (id, delta) =>
-        set((s) => ({
-          goals: s.goals.map((g) =>
-            g.id === id ? { ...g, currentValue: Math.max(0, g.currentValue + delta) } : g,
-          ),
-        })),
+      updateGoal: (id, patch) => {
+        const prev = get().goals;
+        const next = prev.map((g) => (g.id === id ? { ...g, ...patch } : g));
+        set({ goals: next });
+        const updated = next.find((g) => g.id === id);
+        if (updated) syncGoals([updated], () => set({ goals: prev }));
+      },
+      removeGoal: (id) => {
+        const prev = get().goals;
+        set({ goals: prev.filter((g) => g.id !== id) });
+        syncRemoveGoal(id, () => set({ goals: prev }));
+      },
+      incrementGoal: (id, delta) => {
+        const prev = get().goals;
+        const next = prev.map((g) =>
+          g.id === id ? { ...g, currentValue: Math.max(0, g.currentValue + delta) } : g,
+        );
+        set({ goals: next });
+        const updated = next.find((g) => g.id === id);
+        if (updated) syncGoals([updated], () => set({ goals: prev }));
+      },
 
-      addValue: (text) =>
-        set((s) => ({
-          values: [...s.values, { id: uid(), text, rank: nextRank(s.values.map((v) => v.rank)) }],
-        })),
-      updateValue: (id, text) =>
-        set((s) => ({ values: s.values.map((v) => (v.id === id ? { ...v, text } : v)) })),
-      removeValue: (id) => set((s) => ({ values: s.values.filter((v) => v.id !== id) })),
+      addValue: (text) => {
+        const prev = get().values;
+        const value: Value = {
+          id: uid(),
+          text,
+          rank: nextRank(prev.map((v) => v.rank)),
+        };
+        set({ values: [...prev, value] });
+        syncValues([value], () => set({ values: prev }));
+      },
+      updateValue: (id, text) => {
+        const prev = get().values;
+        const next = prev.map((v) => (v.id === id ? { ...v, text } : v));
+        set({ values: next });
+        const updated = next.find((v) => v.id === id);
+        if (updated) syncValues([updated], () => set({ values: prev }));
+      },
+      removeValue: (id) => {
+        const prev = get().values;
+        set({ values: prev.filter((v) => v.id !== id) });
+        syncRemoveValue(id, () => set({ values: prev }));
+      },
     }),
     {
       name: 'flow-goals',
@@ -94,7 +129,7 @@ export function goalById(goals: Goal[], id: string | null | undefined): Goal | u
 
 export function activeGoals(goals: Goal[]): Goal[] {
   return goals
-    .map((g) => ({ ...g, horizon: g.horizon ?? 'jaar' as GoalHorizon }))
+    .map((g) => ({ ...g, horizon: g.horizon ?? ('jaar' as GoalHorizon) }))
     .filter((g) => g.active)
     .sort((a, b) => a.rank - b.rank);
 }
