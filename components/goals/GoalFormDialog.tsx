@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Segmented } from '@/components/ui/segmented';
 import { useGoalsStore } from '@/stores/useGoalsStore';
 import { GOAL_COLOR_PALETTE } from '@/lib/labels';
+import { ColorPicker } from '@/components/ui/ColorPicker';
 import { horizonLabel } from '@/lib/dates';
 import type { Goal, GoalHorizon, GoalScope } from '@/lib/types';
-import { cn } from '@/lib/utils';
 
 const HORIZONS: GoalHorizon[] = ['maand', 'kwartaal', 'jaar'];
 
@@ -87,30 +87,17 @@ export function GoalFormDialog({ open, onOpenChange, goal, defaultHorizon }: {
             />
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="panel-label mb-1.5">Scope</p>
-              <Segmented<GoalScope>
-                options={[{ value: 'zakelijk', label: 'Zakelijk' }, { value: 'prive', label: 'Privé' }]}
-                value={scope}
-                onChange={(v) => v && setScope(v)}
-              />
-            </div>
-            <div>
-              <p className="panel-label mb-1.5">Kleur</p>
-              <div className="flex gap-1.5">
-                {GOAL_COLOR_PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setColor(c)}
-                    className={cn('h-6 w-6 rounded-pill transition-transform duration-150 cursor-pointer', color === c && 'scale-110 ring-2 ring-offset-2 ring-offset-surface')}
-                    style={{ backgroundColor: c, ...(color === c ? { ['--tw-ring-color' as string]: c } : {}) }}
-                    aria-label={`Kleur ${c}`}
-                  />
-                ))}
-              </div>
-            </div>
+          <div>
+            <p className="panel-label mb-1.5">Scope</p>
+            <Segmented<GoalScope>
+              options={[{ value: 'zakelijk', label: 'Zakelijk' }, { value: 'prive', label: 'Privé' }]}
+              value={scope}
+              onChange={(v) => v && setScope(v)}
+            />
+          </div>
+          <div>
+            <p className="panel-label mb-1.5">Kleur</p>
+            <ColorPicker value={color} onChange={setColor} />
           </div>
 
           <div className="grid grid-cols-3 gap-2">

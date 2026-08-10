@@ -6,6 +6,7 @@ import type { DayKey, Daypart } from '@/lib/types';
 import { PartSection } from './PartSection';
 import { TaskCard } from './TaskCard';
 import { QuickWinsBundlePrompt, QuickWinsCard } from './QuickWinsCard';
+import { ThinScrollArea } from '@/components/ui/ThinScrollArea';
 import { DropdownMenu, DropdownTrigger, DropdownContent, DropdownItem, DropdownSeparator } from '@/components/ui/dropdown';
 import { Textarea } from '@/components/ui/input';
 import {
@@ -118,6 +119,12 @@ export function Column({
     return quickWinsBundled ? section.filter((t) => !isQuickWin(t, threshold)) : section;
   }
 
+  const unpartedTasks = dateISO ? visibleDayTasks(null) : [];
+  const daypartsEmpty = dateISO
+    ? DAYPARTS.every((p) => visibleDayTasks(p).length === 0)
+    : true;
+  const showUnpartedSection = unpartedTasks.length > 0 || daypartsEmpty;
+
   if (closed && dateISO) {
     return (
       <div
@@ -178,11 +185,16 @@ export function Column({
         />
       </div>
 
-      <div className="thin-scroll flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-2.5 pb-2.5 pt-1">
+      <ThinScrollArea className="flex flex-col gap-3 px-2.5 pb-2.5 pt-1">
         {dayKey === 'gedaan' ? (
           <PartSection dayKey="gedaan" daypart={null} tasks={doneTasks} showHeader={false} showAdd={false} />
         ) : dayKey === 'algemeen' ? (
-          <PartSection dayKey="algemeen" daypart={null} tasks={openTasksFor(tasks, 'algemeen', null)} showHeader={false} />
+          <PartSection
+            dayKey="algemeen"
+            daypart={null}
+            tasks={openTasksFor(tasks, 'algemeen', null)}
+            showHeader={false}
+          />
         ) : dateISO ? (
           <>
             {quickWinsBundled && quickWins.length > 0 && (
@@ -199,14 +211,14 @@ export function Column({
                 weekOf={columnWeekOf}
               />
             )}
-            {visibleDayTasks(null).length > 0 && (
+            {showUnpartedSection && (
               <PartSection
                 dayKey={resolvedDayKey}
                 daypart={null}
                 weekOf={columnWeekOf}
-                tasks={visibleDayTasks(null)}
+                tasks={unpartedTasks}
                 showHeader={false}
-                showAdd={false}
+                showAdd
               />
             )}
             {DAYPARTS.map((daypart) => (
@@ -220,7 +232,7 @@ export function Column({
             ))}
           </>
         ) : null}
-      </div>
+      </ThinScrollArea>
     </div>
   );
 }

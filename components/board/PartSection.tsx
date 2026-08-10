@@ -7,6 +7,7 @@ import { ChevronDown } from 'lucide-react';
 import type { DayKey, Daypart, Task } from '@/lib/types';
 import { TaskCard } from './TaskCard';
 import { AddTaskInline } from './AddTaskInline';
+import { InsertTaskGap } from './InsertTaskGap';
 import { DAYPART_LABELS, weekOf } from '@/lib/dates';
 import { cn, formatMinutes } from '@/lib/utils';
 
@@ -99,14 +100,34 @@ export function PartSection({
       {(!collapsible || expanded) && (
         <div
           className={cn(
-            'flex flex-col gap-2',
+            'flex flex-col gap-1.5',
             tasks.length === 0 && !children && 'min-h-[36px]',
           )}
         >
           {children}
           <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-            {tasks.map((task) => (
-              <TaskCard key={task.id} task={task} />
+            {tasks.map((task, i) => (
+              <div key={task.id} className="relative">
+                {i === 0 && (
+                  <InsertTaskGap
+                    dayKey={dayKey}
+                    daypart={daypart}
+                    weekOf={columnWeek}
+                    insertBeforeId={task.id}
+                    edge="before"
+                  />
+                )}
+                <TaskCard task={task} />
+                {i < tasks.length - 1 && (
+                  <InsertTaskGap
+                    dayKey={dayKey}
+                    daypart={daypart}
+                    weekOf={columnWeek}
+                    insertBeforeId={tasks[i + 1].id}
+                    edge="after"
+                  />
+                )}
+              </div>
             ))}
           </SortableContext>
           {showAdd && (

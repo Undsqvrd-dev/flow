@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Plus, Columns3 } from 'lucide-react';
 import { StatRow } from './StatRow';
 import { WeekTargetCard } from './WeekTargetCard';
+import { YearGoalCard } from './YearGoalCard';
 import { TimerCard } from './TimerCard';
 import { MoodQuoteRow } from './MoodQuoteRow';
 import { SportPanel } from '@/components/sport/SportWidgets';
@@ -37,8 +38,9 @@ export function DashboardPage() {
         <TimerCard />
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <WeekTargetCard />
+        <YearGoalCard />
         <SportPanel />
       </div>
 

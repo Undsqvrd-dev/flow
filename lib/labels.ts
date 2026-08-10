@@ -1,18 +1,26 @@
 /**
- * Vast labelpalet (Trello-achtig). Een label op een taak is de hexwaarde zelf.
+ * Presetkleuren voor labels/doelen. Vrije hex via ColorPicker blijft mogelijk.
  * Dit zijn door de gebruiker gekozen datakleuren, geen UI-tokens.
  */
 export const LABEL_PALETTE = [
-  '#1F9254', // groen
-  '#0E7490', // teal
-  '#2563EB', // blauw
-  '#7C3AED', // paars
-  '#DB2777', // roze
-  '#D24A4A', // rood
-  '#D98B14', // amber
-  '#57534E', // bruingrijs
+  '#1F9254',
+  '#4FB87B',
+  '#0E7490',
+  '#0891B2',
+  '#2563EB',
+  '#3B82F6',
+  '#7C3AED',
+  '#A855F7',
+  '#DB2777',
+  '#EC4899',
+  '#D24A4A',
+  '#F97316',
+  '#D98B14',
+  '#EAB308',
+  '#57534E',
+  '#0E3524',
+  '#171C19',
+  '#FFFFFF',
 ] as const;
 
-export const GOAL_COLOR_PALETTE = [
-  '#1F9254', '#0E7490', '#2563EB', '#7C3AED', '#DB2777', '#D24A4A', '#D98B14', '#0E3524',
-] as const;
+export const GOAL_COLOR_PALETTE = LABEL_PALETTE;

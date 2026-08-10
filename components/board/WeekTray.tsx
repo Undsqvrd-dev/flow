@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { PartSection } from './PartSection';
+import { ThinScrollArea } from '@/components/ui/ThinScrollArea';
 import { useBoardStore, openTasksFor } from '@/stores/useBoardStore';
 import { useUiStore } from '@/stores/useUiStore';
 import { cn } from '@/lib/utils';
@@ -68,14 +69,14 @@ export function WeekTray() {
         </button>
       </div>
 
-      <div className="thin-scroll flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-2.5 pb-2.5 pt-1">
+      <ThinScrollArea className="flex flex-col gap-3 px-2.5 pb-2.5 pt-1">
         <PartSection
           dayKey="algemeen"
           daypart={null}
           tasks={weekTasks}
           showHeader={false}
         />
-      </div>
+      </ThinScrollArea>
     </div>
   );
 }

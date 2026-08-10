@@ -3,7 +3,7 @@ import { uid } from '@/lib/utils';
 import type { MoodboardImage } from '@/lib/types';
 
 const BUCKET = 'moodboard';
-const MAX_BYTES = 4 * 1024 * 1024; // 4 MB
+const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 export async function uploadMoodboardImage(file: File): Promise<MoodboardImage> {
@@ -11,7 +11,7 @@ export async function uploadMoodboardImage(file: File): Promise<MoodboardImage> 
     throw new Error('Alleen JPG, PNG, WebP of GIF.');
   }
   if (file.size > MAX_BYTES) {
-    throw new Error('Foto mag maximaal 4 MB zijn.');
+    throw new Error('Foto mag maximaal 15 MB zijn.');
   }
 
   const supabase = createClient();

@@ -12,6 +12,22 @@ import { useFocusStore, currentFocus } from '@/stores/useFocusStore';
 import { useUiStore } from '@/stores/useUiStore';
 import { cn, formatMinutes } from '@/lib/utils';
 
+function LabelDots({ labels }: { labels: { id: string; name: string; color: string }[] }) {
+  if (labels.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1">
+      {labels.map((label) => (
+        <span
+          key={label.id}
+          title={label.name || undefined}
+          className="h-2 w-2 shrink-0 rounded-pill"
+          style={{ backgroundColor: label.color }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function TaskCard({ task, sortable = true }: { task: Task; sortable?: boolean }) {
   const toggleDone = useBoardStore((s) => s.toggleDone);
   const moveRank = useBoardStore((s) => s.moveRank);
@@ -33,6 +49,16 @@ export function TaskCard({ task, sortable = true }: { task: Task; sortable?: boo
     .map((id) => labelById(labelDefs, id) ?? (id.startsWith('#') ? { id, name: '', color: id } : null))
     .filter((l): l is { id: string; name: string; color: string } => l !== null);
 
+  const hasMeta =
+    Boolean(goal) ||
+    task.estimateMin !== null ||
+    Boolean(task.description?.trim()) ||
+    task.checklist.length > 0 ||
+    Boolean(task.fromPreviousWeek) ||
+    (showBadges && task.urgent !== null);
+
+  const showFooter = hasMeta || resolvedLabels.length > 0;
+
   return (
     <div
       ref={setNodeRef}
@@ -47,19 +73,6 @@ export function TaskCard({ task, sortable = true }: { task: Task; sortable?: boo
         task.done && 'opacity-70',
       )}
     >
-      {resolvedLabels.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1">
-          {resolvedLabels.map((label) => (
-            <span
-              key={label.id}
-              title={label.name || undefined}
-              className="h-1.5 w-7 rounded-pill"
-              style={{ backgroundColor: label.color }}
-            />
-          ))}
-        </div>
-      )}
-
       <div className="flex items-start gap-2">
         <input
           type="checkbox"
@@ -74,8 +87,6 @@ export function TaskCard({ task, sortable = true }: { task: Task; sortable?: boo
         />
         <p className={cn(
           'min-w-0 flex-1 text-[13.5px] font-medium leading-snug text-txt transition-[margin] duration-150',
-          // Open kaarten: titel schuift over de (onzichtbare) checkbox; bij hover ruimte maken.
-          // Afgeronde kaarten: checkbox blijft zichtbaar → geen negatieve margin.
           !task.done && '-ml-6 group-hover:ml-0',
           task.done && 'text-muted line-through',
         )}>
@@ -85,7 +96,6 @@ export function TaskCard({ task, sortable = true }: { task: Task; sortable?: boo
           {task.title}
         </p>
 
-        {/* Rank-knoppen ín de kaart (rechts), zodat ze niet buiten beeld vallen. */}
         {sortable && !task.done && (
           <div className="invisible flex shrink-0 flex-col gap-0.5 group-hover:visible">
             <button
@@ -110,7 +120,7 @@ export function TaskCard({ task, sortable = true }: { task: Task; sortable?: boo
         )}
       </div>
 
-      {(goal || task.estimateMin || task.description || task.checklist.length > 0 || task.fromPreviousWeek || (showBadges && task.urgent !== null)) && (
+      {showFooter && (
         <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted">
           {goal && (
             <span className="inline-flex max-w-[130px] items-center gap-1">
@@ -136,6 +146,7 @@ export function TaskCard({ task, sortable = true }: { task: Task; sortable?: boo
           {task.fromPreviousWeek && (
             <span className="rounded-pill bg-surface-3 px-1.5 py-0.5 text-[10px] font-medium text-muted">van vorige week</span>
           )}
+          <LabelDots labels={resolvedLabels} />
           {showBadges && <span className="ml-auto"><QuadrantPill urgent={task.urgent} important={task.important} /></span>}
         </div>
       )}

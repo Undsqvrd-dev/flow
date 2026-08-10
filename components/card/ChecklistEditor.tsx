@@ -6,12 +6,14 @@ import type { ChecklistItem } from '@/lib/types';
 import { ProgressBar } from '@/components/ui/progress';
 import { nextRank, uid, cn } from '@/lib/utils';
 
-/** Checklist met voortgangsbalk; Enter maakt direct het volgende item. */
+/** Checklist met voortgangsbalk; items zijn inline bewerkbaar. */
 export function ChecklistEditor({ items, onChange }: {
   items: ChecklistItem[];
   onChange: (items: ChecklistItem[]) => void;
 }) {
   const [draft, setDraft] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
   const sorted = [...items].sort((a, b) => a.rank - b.rank);
   const done = items.filter((i) => i.done).length;
 
@@ -28,6 +30,23 @@ export function ChecklistEditor({ items, onChange }: {
 
   function remove(id: string) {
     onChange(items.filter((i) => i.id !== id));
+  }
+
+  function startEdit(item: ChecklistItem) {
+    setEditingId(item.id);
+    setEditText(item.text);
+  }
+
+  function commitEdit() {
+    if (!editingId) return;
+    const text = editText.trim();
+    if (!text) {
+      remove(editingId);
+    } else {
+      onChange(items.map((i) => (i.id === editingId ? { ...i, text } : i)));
+    }
+    setEditingId(null);
+    setEditText('');
   }
 
   return (
@@ -47,9 +66,33 @@ export function ChecklistEditor({ items, onChange }: {
               onChange={() => toggle(item.id)}
               className="h-4 w-4 shrink-0 cursor-pointer accent-(--green)"
             />
-            <span className={cn('flex-1 text-sm', item.done ? 'text-muted line-through' : 'text-txt-2')}>
-              {item.text}
-            </span>
+            {editingId === item.id ? (
+              <input
+                autoFocus
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onBlur={commitEdit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEdit();
+                  if (e.key === 'Escape') {
+                    setEditingId(null);
+                    setEditText('');
+                  }
+                }}
+                className="h-7 min-w-0 flex-1 rounded-[6px] border border-green bg-surface px-2 text-sm text-txt outline-none"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => startEdit(item)}
+                className={cn(
+                  'min-w-0 flex-1 cursor-text rounded-[6px] px-1 py-0.5 text-left text-sm',
+                  item.done ? 'text-muted line-through' : 'text-txt-2',
+                )}
+              >
+                {item.text}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => remove(item.id)}

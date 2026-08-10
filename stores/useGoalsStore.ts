@@ -144,3 +144,11 @@ export function mainMonthTarget(goals: Goal[]): Goal | undefined {
     month.find((g) => g.targetValue !== null && g.targetValue > 0) ?? month[0]
   );
 }
+
+/** Eerste actieve jaardoel (voorkeur met targetwaarde). */
+export function mainYearGoal(goals: Goal[]): Goal | undefined {
+  const year = activeGoals(goals).filter((g) => g.horizon === 'jaar');
+  return (
+    year.find((g) => g.targetValue !== null && g.targetValue > 0) ?? year[0]
+  );
+}

@@ -2,7 +2,8 @@
 
 import { useRef, useState } from 'react';
 import { Plus, Trash2, Upload, Volume2 } from 'lucide-react';
-import { Input, Textarea } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
+import { AutoTextarea } from '@/components/ui/auto-textarea';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { useSettingsStore } from '@/stores/useSettingsStore';
@@ -10,8 +11,9 @@ import { useUiStore } from '@/stores/useUiStore';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useAlarm } from '@/lib/useAlarm';
 import { importTrello, type TrelloExport } from '@/lib/importTrello';
-import { GOAL_COLOR_PALETTE } from '@/lib/labels';
+import { LABEL_PALETTE } from '@/lib/labels';
 import { uid, cn } from '@/lib/utils';
+import { ColorPicker } from '@/components/ui/ColorPicker';
 import { SignOutButton } from '@/components/auth/SignOutButton';
 import { MoodboardEditor } from '@/components/settings/MoodboardEditor';
 import type { Settings } from '@/lib/types';
@@ -62,7 +64,7 @@ function LabelsEditor() {
   const updateLabel = useSettingsStore((s) => s.updateLabel);
   const removeLabel = useSettingsStore((s) => s.removeLabel);
   const [name, setName] = useState('');
-  const [color, setColor] = useState<string>(GOAL_COLOR_PALETTE[0]);
+  const [color, setColor] = useState<string>(LABEL_PALETTE[0]);
 
   function submit() {
     const trimmed = name.trim();
@@ -73,60 +75,54 @@ function LabelsEditor() {
 
   return (
     <div className="flex flex-col gap-3">
-      <ul className="flex flex-col gap-1.5">
+      <p className="text-[12px] text-muted">
+        Labels verschijnen als kleurstipjes op kaarten (bij hover) en met naam in de geopende kaart.
+      </p>
+      <ul className="flex flex-col gap-2">
         {labels.map((label) => (
-          <li key={label.id} className="flex items-center gap-2 rounded-[10px] bg-surface-2 px-2.5 py-2">
-            <div className="flex gap-1">
-              {GOAL_COLOR_PALETTE.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => updateLabel(label.id, { color: c })}
-                  className={cn(
-                    'h-4 w-4 rounded-pill cursor-pointer',
-                    label.color === c && 'ring-2 ring-offset-1 ring-offset-surface-2 scale-110',
-                  )}
-                  style={{ backgroundColor: c, ...(label.color === c ? { ['--tw-ring-color' as string]: c } : {}) }}
-                  aria-label={c}
-                />
-              ))}
+          <li
+            key={label.id}
+            className="flex flex-col gap-2 rounded-[12px] border border-line bg-surface-2 px-3 py-2.5"
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-[12px] font-medium"
+                style={{ backgroundColor: `${label.color}22`, color: label.color }}
+              >
+                <span className="h-2 w-2 rounded-pill" style={{ backgroundColor: label.color }} />
+                {label.name || 'Label'}
+              </span>
+              <input
+                value={label.name}
+                onChange={(e) => updateLabel(label.id, { name: e.target.value })}
+                className="h-8 min-w-0 flex-1 rounded-[8px] bg-transparent px-2 text-sm text-txt outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => removeLabel(label.id)}
+                className="rounded-[6px] p-1 text-muted hover:bg-red/10 hover:text-red cursor-pointer"
+                aria-label="Label verwijderen"
+              >
+                <Trash2 size={14} strokeWidth={1.75} />
+              </button>
             </div>
-            <input
-              value={label.name}
-              onChange={(e) => updateLabel(label.id, { name: e.target.value })}
-              className="h-8 min-w-0 flex-1 rounded-[8px] bg-transparent px-2 text-sm text-txt outline-none"
+            <ColorPicker
+              value={label.color}
+              onChange={(c) => updateLabel(label.id, { color: c })}
+              offsetClass="ring-offset-surface-2"
             />
-            <button
-              type="button"
-              onClick={() => removeLabel(label.id)}
-              className="rounded-[6px] p-1 text-muted hover:bg-red/10 hover:text-red cursor-pointer"
-              aria-label="Label verwijderen"
-            >
-              <Trash2 size={14} strokeWidth={1.75} />
-            </button>
           </li>
         ))}
       </ul>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 rounded-[12px] border border-dashed border-line-2 px-3 py-3">
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
           placeholder="Nieuw label…"
-          className="min-w-[140px] flex-1"
         />
-        <div className="flex gap-1">
-          {GOAL_COLOR_PALETTE.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setColor(c)}
-              className={cn('h-5 w-5 rounded-pill cursor-pointer', color === c && 'ring-2 ring-offset-1 ring-offset-surface scale-110')}
-              style={{ backgroundColor: c, ...(color === c ? { ['--tw-ring-color' as string]: c } : {}) }}
-            />
-          ))}
-        </div>
-        <Button variant="secondary" size="sm" onClick={submit} disabled={!name.trim()}>
+        <ColorPicker value={color} onChange={setColor} />
+        <Button variant="secondary" size="sm" onClick={submit} disabled={!name.trim()} className="self-start">
           <Plus size={14} strokeWidth={2} /> Toevoegen
         </Button>
       </div>
@@ -187,11 +183,11 @@ export function SettingsPage() {
         </Panel>
 
         <Panel title="Affirmatie">
-          <Textarea
+          <AutoTextarea
             value={settings.affirmation}
             onChange={(e) => update({ affirmation: e.target.value })}
             placeholder="Affirmatie… (Enter voor nieuwe regel)"
-            rows={4}
+            minRows={3}
           />
         </Panel>
 

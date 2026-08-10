@@ -111,7 +111,7 @@ export function CardSidePanel({ task }: { task: Task }) {
         {labelDefs.length === 0 ? (
           <p className="text-[12px] text-muted">Nog geen labels. Maak ze aan bij Instellingen.</p>
         ) : (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap gap-1.5">
             {labelDefs.map((label) => {
               const active = task.labels.includes(label.id);
               return (
@@ -126,11 +126,16 @@ export function CardSidePanel({ task }: { task: Task }) {
                     })
                   }
                   className={cn(
-                    'flex items-center gap-2 rounded-[8px] px-2 py-1.5 text-left text-[12.5px] transition-colors duration-150 cursor-pointer',
-                    active ? 'bg-green-50 text-green font-medium' : 'text-txt-2 hover:bg-surface',
+                    'inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-[12px] font-medium transition-colors duration-150 cursor-pointer',
+                    active ? 'ring-2 ring-offset-1 ring-offset-surface' : 'opacity-70 hover:opacity-100',
                   )}
+                  style={{
+                    backgroundColor: `${label.color}22`,
+                    color: label.color,
+                    ...(active ? { ['--tw-ring-color' as string]: label.color } : {}),
+                  }}
                 >
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-pill" style={{ backgroundColor: label.color }} />
+                  <span className="h-2 w-2 shrink-0 rounded-pill" style={{ backgroundColor: label.color }} />
                   {label.name}
                 </button>
               );

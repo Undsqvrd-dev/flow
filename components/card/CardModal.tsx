@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Copy, Play, Trash2, Archive } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/input';
+import { AutoTextarea } from '@/components/ui/auto-textarea';
 import { Button } from '@/components/ui/button';
 import { ChecklistEditor } from './ChecklistEditor';
 import { CommentList } from './CommentList';
@@ -111,8 +111,8 @@ export function CardModal() {
             <div className="flex flex-col gap-6">
               <section>
                 <p className="panel-label mb-2">Omschrijving</p>
-                <Textarea
-                  rows={3}
+                <AutoTextarea
+                  minRows={3}
                   value={t.description ?? ''}
                   onChange={(e) => updateTask(t.id, { description: e.target.value || null })}
                   placeholder="Waar gaat dit over?"

@@ -11,7 +11,7 @@ import {
   todayISO,
   weekOf,
 } from '@/lib/dates';
-import { nextRank, RANK_STEP, uid } from '@/lib/utils';
+import { nextRank, prevRank, rankBetween, RANK_STEP, uid } from '@/lib/utils';
 import { QUADRANT_ORDER, quadrant, type Quadrant } from '@/lib/priority';
 import { setQuickWinBundleCache } from '@/lib/db/bundleCache';
 import {
@@ -33,6 +33,10 @@ export interface NewTaskInput {
   estimateMin?: number | null;
   labels?: string[];
   dueDate?: string | null;
+  /** 'start' = bovenaan de sectie. Default: onderaan. */
+  position?: 'start' | 'end';
+  /** Voeg in vóór deze taak (heeft voorrang op position). */
+  insertBeforeId?: string;
 }
 
 interface BoardState {
@@ -103,7 +107,24 @@ function migrateBundles(bundles: string[]): string[] {
   return [...next];
 }
 
-function makeTask(input: NewTaskInput, ranks: number[]): Task {
+function resolveRank(
+  input: NewTaskInput,
+  siblings: Task[],
+): number {
+  const sorted = [...siblings].sort((a, b) => a.rank - b.rank);
+  if (input.insertBeforeId) {
+    const idx = sorted.findIndex((t) => t.id === input.insertBeforeId);
+    if (idx >= 0) {
+      const before = idx > 0 ? sorted[idx - 1].rank : null;
+      const after = sorted[idx].rank;
+      return rankBetween(before, after);
+    }
+  }
+  const ranks = sorted.map((t) => t.rank);
+  return input.position === 'start' ? prevRank(ranks) : nextRank(ranks);
+}
+
+function makeTask(input: NewTaskInput, siblings: Task[]): Task {
   const now = new Date().toISOString();
   const dayKey = input.dayKey ?? 'algemeen';
   return {
@@ -112,7 +133,7 @@ function makeTask(input: NewTaskInput, ranks: number[]): Task {
     description: input.description ?? null,
     dayKey,
     daypart: input.daypart ?? null,
-    rank: nextRank(ranks),
+    rank: resolveRank(input, siblings),
     goalId: input.goalId ?? null,
     urgent: null,
     important: null,
@@ -146,7 +167,7 @@ export const useBoardStore = create<BoardState>()(
         const siblings = prev.filter((t) =>
           sameSection(t, dayKey, daypart, isBoardDayKey(dayKey) ? columnWeek : undefined),
         );
-        const task = makeTask(input, siblings.map((t) => t.rank));
+        const task = makeTask(input, siblings);
         set({ tasks: [...prev, task] });
         syncTasks([task], () => set({ tasks: prev }));
         return task;

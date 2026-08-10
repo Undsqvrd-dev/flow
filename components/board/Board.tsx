@@ -80,20 +80,24 @@ export function Board() {
   }
 
   // Verticaal muiswiel → horizontaal scrollen over de week.
+  // Boven een kolomlijst: nooit horizontaal (ook geen trackpad-swipe).
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || focusMode) return;
     function onWheel(e: WheelEvent) {
       if (!el) return;
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
       const target = e.target as HTMLElement | null;
-      const nested = target?.closest('.thin-scroll') as HTMLElement | null;
-      if (nested && nested.scrollHeight > nested.clientHeight) {
-        const atTop = nested.scrollTop <= 0 && e.deltaY < 0;
-        const atBottom =
-          nested.scrollTop + nested.clientHeight >= nested.scrollHeight - 1 && e.deltaY > 0;
-        if (!atTop && !atBottom) return;
+      const overList = Boolean(target?.closest('.thin-scroll'));
+
+      if (overList) {
+        // Trackpad links/rechts boven een lijst mag het bord niet meenemen.
+        if (Math.abs(e.deltaX) >= Math.abs(e.deltaY) && e.deltaX !== 0) {
+          e.preventDefault();
+        }
+        return;
       }
+
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
       e.preventDefault();
       el.scrollLeft += e.deltaY;
     }

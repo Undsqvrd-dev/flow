@@ -16,6 +16,11 @@ export function nextRank(ranks: number[]): number {
   return (ranks.length ? Math.max(...ranks) : 0) + RANK_STEP;
 }
 
+/** Nieuwe items bovenaan de sectie. */
+export function prevRank(ranks: number[]): number {
+  return (ranks.length ? Math.min(...ranks) : RANK_STEP) - RANK_STEP;
+}
+
 /** Rank tussen twee buren; herindexeren gebeurt in de store als de ruimte op is. */
 export function rankBetween(before: number | null, after: number | null): number {
   if (before === null && after === null) return RANK_STEP;
