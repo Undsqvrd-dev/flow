@@ -22,7 +22,9 @@ export function ThinScrollArea({
     if (!el) return;
 
     function update() {
-      const { scrollTop, scrollHeight, clientHeight } = el;
+      const node = ref.current;
+      if (!node) return;
+      const { scrollTop, scrollHeight, clientHeight } = node;
       if (scrollHeight <= clientHeight + 1) {
         setThumb((t) => (t.show ? { ...t, show: false } : t));
         return;
