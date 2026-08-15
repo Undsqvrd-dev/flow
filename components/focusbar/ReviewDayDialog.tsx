@@ -2,14 +2,13 @@
 
 import { ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Segmented } from '@/components/ui/segmented';
 import { useBoardStore, openTasksForDate } from '@/stores/useBoardStore';
-import { DAYPART_LABELS, DAYPARTS, nextCalendarDay, todayISO } from '@/lib/dates';
+import { nextCalendarDay, todayISO } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 
 /**
- * "Herzie mijn dag": compacte lijst van vandaag — snel herschikken,
- * dagdelen wisselen en dingen naar morgen schuiven.
+ * "Herzie mijn dag": compacte lijst van vandaag — snel herschikken
+ * en dingen naar morgen schuiven.
  */
 export function ReviewDayDialog({ open, onOpenChange }: {
   open: boolean;
@@ -41,11 +40,6 @@ export function ReviewDayDialog({ open, onOpenChange }: {
                   </button>
                 </div>
                 <span className={cn('min-w-0 flex-1 truncate text-[13px] font-medium text-txt')}>{t.title}</span>
-                <Segmented
-                  options={DAYPARTS.map((d) => ({ value: d, label: DAYPART_LABELS[d].slice(0, 1) }))}
-                  value={t.daypart}
-                  onChange={(v) => updateTask(t.id, { daypart: v })}
-                />
                 <button
                   type="button"
                   onClick={() => updateTask(t.id, {

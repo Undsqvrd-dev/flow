@@ -1,8 +1,8 @@
 'use client';
 
-import { MoreHorizontal, Lock, LockOpen, ArrowRight, ArrowDownWideNarrow, Eraser } from 'lucide-react';
+import { MoreHorizontal, Lock, LockOpen, ArrowRight, Eraser, Bell, Tag, Clock, Undo2 } from 'lucide-react';
 import { parseISO } from 'date-fns';
-import type { DayKey, Daypart } from '@/lib/types';
+import type { DayKey } from '@/lib/types';
 import { PartSection } from './PartSection';
 import { TaskCard } from './TaskCard';
 import { QuickWinsBundlePrompt, QuickWinsCard } from './QuickWinsCard';
@@ -18,11 +18,11 @@ import {
   quickWinsForDay,
   isQuickWinBundled,
   isQuickWin,
+  quickWinBundleKey,
 } from '@/stores/useBoardStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import {
   DAY_LABELS,
-  DAYPARTS,
   dayKeyFromDate,
   isToday,
   shortDate,
@@ -37,16 +37,32 @@ function ColumnMenu({ dayKey, closable, closed, dateISO, columnWeekOf }: {
   dateISO: string | null;
   columnWeekOf: string;
 }) {
-  const { sortColumnByPriority, moveAllToTomorrow, clearColumn, closeDay, reopenDay } = useBoardStore();
+  const sortColumn = useBoardStore((s) => s.sortColumn);
+  const clearColumnSort = useBoardStore((s) => s.clearColumnSort);
+  const hasSortSnapshot = useBoardStore(
+    (s) => Boolean(s.sortSnapshots[quickWinBundleKey(dayKey, columnWeekOf)]?.length),
+  );
+  const { moveAllToTomorrow, clearColumn, closeDay, reopenDay } = useBoardStore();
   return (
     <DropdownMenu>
       <DropdownTrigger className="invisible rounded-[6px] p-1 text-muted hover:bg-surface-3 group-hover/col:visible data-[state=open]:visible cursor-pointer">
         <MoreHorizontal size={15} strokeWidth={1.75} />
       </DropdownTrigger>
       <DropdownContent>
-        <DropdownItem onSelect={() => sortColumnByPriority(dayKey, columnWeekOf)}>
-          <ArrowDownWideNarrow size={14} strokeWidth={1.75} /> Sorteer op prioriteit
+        <DropdownItem onSelect={() => sortColumn(dayKey, 'priority', columnWeekOf)}>
+          <Bell size={14} strokeWidth={1.75} /> Sorteer op prioriteit
         </DropdownItem>
+        <DropdownItem onSelect={() => sortColumn(dayKey, 'labels', columnWeekOf)}>
+          <Tag size={14} strokeWidth={1.75} /> Sorteer op labels
+        </DropdownItem>
+        <DropdownItem onSelect={() => sortColumn(dayKey, 'estimate', columnWeekOf)}>
+          <Clock size={14} strokeWidth={1.75} /> Sorteer op tijdsduur
+        </DropdownItem>
+        {hasSortSnapshot && (
+          <DropdownItem onSelect={() => clearColumnSort(dayKey, columnWeekOf)}>
+            <Undo2 size={14} strokeWidth={1.75} /> Sortering uit
+          </DropdownItem>
+        )}
         {closable && dateISO && (
           <DropdownItem onSelect={() => (closed ? reopenDay(dateISO) : closeDay(dateISO))}>
             {closed ? <LockOpen size={14} strokeWidth={1.75} /> : <Lock size={14} strokeWidth={1.75} />}
@@ -113,17 +129,12 @@ export function Column({
     ? isQuickWinBundled(quickWinBundles, resolvedDayKey, columnWeekOf)
     : false;
 
-  function visibleDayTasks(daypart: Daypart | null) {
-    if (!dateISO) return [];
-    const section = openTasksForDate(tasks, dateISO, daypart);
-    return quickWinsBundled ? section.filter((t) => !isQuickWin(t, threshold)) : section;
-  }
-
-  const unpartedTasks = dateISO ? visibleDayTasks(null) : [];
-  const daypartsEmpty = dateISO
-    ? DAYPARTS.every((p) => visibleDayTasks(p).length === 0)
-    : true;
-  const showUnpartedSection = unpartedTasks.length > 0 || daypartsEmpty;
+  const dayTasks = dateISO
+    ? (() => {
+        const section = openTasksForDate(tasks, dateISO);
+        return quickWinsBundled ? section.filter((t) => !isQuickWin(t, threshold)) : section;
+      })()
+    : [];
 
   if (closed && dateISO) {
     return (
@@ -211,25 +222,14 @@ export function Column({
                 weekOf={columnWeekOf}
               />
             )}
-            {showUnpartedSection && (
-              <PartSection
-                dayKey={resolvedDayKey}
-                daypart={null}
-                weekOf={columnWeekOf}
-                tasks={unpartedTasks}
-                showHeader={false}
-                showAdd
-              />
-            )}
-            {DAYPARTS.map((daypart) => (
-              <PartSection
-                key={daypart}
-                dayKey={resolvedDayKey}
-                daypart={daypart}
-                weekOf={columnWeekOf}
-                tasks={visibleDayTasks(daypart)}
-              />
-            ))}
+            <PartSection
+              dayKey={resolvedDayKey}
+              daypart={null}
+              weekOf={columnWeekOf}
+              tasks={dayTasks}
+              showHeader={false}
+              showAdd
+            />
           </>
         ) : null}
       </ThinScrollArea>

@@ -16,11 +16,12 @@ import { FocusBar } from '@/components/focusbar/FocusBar';
 import {
   useBoardStore,
   openTasksFor,
+  openTasksForDay,
   quickWinsForDay,
 } from '@/stores/useBoardStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useUiStore } from '@/stores/useUiStore';
-import { dayKeyFromDate, rollingBoardDates, todayISO } from '@/lib/dates';
+import { dayKeyFromDate, isBoardDayKey, rollingBoardDates, todayISO } from '@/lib/dates';
 import { parseQuickWinDragId } from '@/lib/quickWinDrag';
 import { cn } from '@/lib/utils';
 
@@ -38,16 +39,18 @@ function targetOf(
   }
   const overTask = tasks.find((t) => t.id === overId);
   if (!overTask) return null;
-  const siblings = openTasksFor(
-    tasks,
-    overTask.dayKey,
-    overTask.daypart,
-    overTask.weekOf,
-  );
+  const siblings = isBoardDayKey(overTask.dayKey)
+    ? openTasksForDay(tasks, overTask.dayKey, overTask.weekOf)
+    : openTasksFor(
+        tasks,
+        overTask.dayKey,
+        overTask.daypart,
+        overTask.weekOf,
+      );
   const index = siblings.findIndex((t) => t.id === overTask.id);
   return {
     dayKey: overTask.dayKey,
-    daypart: overTask.daypart,
+    daypart: isBoardDayKey(overTask.dayKey) ? null : overTask.daypart,
     weekOf: overTask.weekOf,
     index: index === -1 ? 0 : index,
   };
@@ -186,7 +189,8 @@ export function Board() {
     if (task.done) {
       updateTask(task.id, { done: false, completedAt: null });
     }
-    moveTask(task.id, target.dayKey, target.daypart, target.index, target.weekOf);
+    const daypart = isBoardDayKey(target.dayKey) ? null : target.daypart;
+    moveTask(task.id, target.dayKey, daypart, target.index, target.weekOf);
   }
 
   return (

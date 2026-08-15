@@ -25,7 +25,7 @@ export function NewTaskDialog() {
   function submit() {
     const trimmed = title.trim();
     if (!trimmed) return;
-    addTask({ title: trimmed, dayKey: todayKey(), daypart: 'dag' });
+    addTask({ title: trimmed, dayKey: todayKey(), daypart: null });
     setTitle('');
     setOpen(false);
   }

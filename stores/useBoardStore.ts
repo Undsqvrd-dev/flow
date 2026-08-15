@@ -12,7 +12,7 @@ import {
   weekOf,
 } from '@/lib/dates';
 import { nextRank, prevRank, rankBetween, RANK_STEP, uid } from '@/lib/utils';
-import { QUADRANT_ORDER, quadrant, type Quadrant } from '@/lib/priority';
+import { QUADRANT_ORDER, quadrant } from '@/lib/priority';
 import { setQuickWinBundleCache } from '@/lib/db/bundleCache';
 import {
   syncDayStates,
@@ -22,6 +22,10 @@ import {
   syncTasks,
 } from '@/lib/db/storeSync';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+
+export type ColumnSortBy = 'priority' | 'labels' | 'estimate';
+
+type SortSnapshotEntry = { id: string; rank: number; daypart: Daypart | null };
 
 export interface NewTaskInput {
   title: string;
@@ -44,6 +48,8 @@ interface BoardState {
   dayStates: DayState[];
   /** Bundelsleutels `weekOf:dayKey` — korte taken van die dag zitten in QuickWin's. */
   quickWinBundles: string[];
+  /** Oorspronkelijke volgorde per kolom vóór sorteren (`weekOf:dayKey`). */
+  sortSnapshots: Record<string, SortSnapshotEntry[]>;
 
   addTask: (input: NewTaskInput) => Task;
   updateTask: (id: string, patch: Partial<Task>) => void;
@@ -66,6 +72,10 @@ interface BoardState {
     toWeekOf: string,
   ) => void;
   moveRank: (id: string, direction: -1 | 1) => void;
+  /** Sorteer open taken in een kolom. */
+  sortColumn: (dayKey: DayKey, by: ColumnSortBy, columnWeekOf?: string) => void;
+  /** Herstel volgorde van vóór sorteren. */
+  clearColumnSort: (dayKey: DayKey, columnWeekOf?: string) => void;
   sortColumnByPriority: (dayKey: DayKey, columnWeekOf?: string) => void;
   /** Verplaats alle open taken van deze kalenderdatum naar morgen. */
   moveAllToTomorrow: (dateISO: string) => void;
@@ -165,6 +175,7 @@ export const useBoardStore = create<BoardState>()(
       tasks: [],
       dayStates: [],
       quickWinBundles: [],
+      sortSnapshots: {},
 
       addTask: (input) => {
         const dayKey = input.dayKey ?? 'algemeen';
@@ -237,26 +248,27 @@ export const useBoardStore = create<BoardState>()(
         if (!task) return;
         const prev = state.tasks;
         const week = targetWeekOf ?? weekOf();
+        const flatBoardDay = isBoardDayKey(dayKey);
         const siblings = state.tasks
-          .filter(
-            (t) =>
-              t.id !== id &&
-              !t.done &&
-              sameSection(t, dayKey, daypart, isBoardDayKey(dayKey) ? week : undefined),
-          )
+          .filter((t) => {
+            if (t.id === id || t.done || t.dayKey !== dayKey) return false;
+            if (flatBoardDay) return t.weekOf === week;
+            return t.daypart === daypart;
+          })
           .sort((a, b) => a.rank - b.rank);
         const ordered = [...siblings];
         const clamped = Math.max(0, Math.min(index, ordered.length));
         ordered.splice(clamped, 0, task);
+        const targetPart = flatBoardDay ? null : daypart;
         const patches = new Map<string, Partial<Task>>();
         ordered.forEach((t, i) => {
           patches.set(t.id, {
             rank: (i + 1) * RANK_STEP,
+            daypart: targetPart,
             ...(t.id === id
               ? {
                   dayKey,
-                  daypart,
-                  weekOf: isBoardDayKey(dayKey) ? week : weekOf(),
+                  weekOf: flatBoardDay ? week : weekOf(),
                 }
               : {}),
           });
@@ -333,87 +345,130 @@ export const useBoardStore = create<BoardState>()(
         if (!task || task.done) return;
 
         const section = state.tasks
-          .filter(
-            (t) =>
-              !t.done &&
-              sameSection(
-                t,
-                task.dayKey,
-                task.daypart,
-                isBoardDayKey(task.dayKey) ? task.weekOf : undefined,
-              ),
-          )
+          .filter((t) => {
+            if (t.done || t.dayKey !== task.dayKey) return false;
+            if (isBoardDayKey(task.dayKey)) return t.weekOf === task.weekOf;
+            return true;
+          })
           .sort((a, b) => a.rank - b.rank);
         const i = section.findIndex((t) => t.id === id);
         const j = i + direction;
 
-        if (j >= 0 && j < section.length) {
-          const other = section[j];
-          const prev = state.tasks;
-          const next = prev.map((t) => {
-            if (t.id === task.id) return touch({ ...t, rank: other.rank });
-            if (t.id === other.id) return touch({ ...t, rank: task.rank });
-            return t;
-          });
-          set({ tasks: next });
-          syncTasks(
-            next.filter((t) => t.id === task.id || t.id === other.id),
-            () => set({ tasks: prev }),
-          );
-          return;
+        if (j < 0 || j >= section.length) return;
+
+        const other = section[j];
+        const prev = state.tasks;
+        const next = prev.map((t) => {
+          if (t.id === task.id) return touch({ ...t, rank: other.rank, daypart: null });
+          if (t.id === other.id) return touch({ ...t, rank: task.rank, daypart: null });
+          return t;
+        });
+        set({ tasks: next });
+        syncTasks(
+          next.filter((t) => t.id === task.id || t.id === other.id),
+          () => set({ tasks: prev }),
+        );
+      },
+
+      sortColumn: (dayKey, by, columnWeekOf) => {
+        const state = get();
+        const week = columnWeekOf ?? weekOf();
+        const snapKey = quickWinBundleKey(dayKey, week);
+        const section = state.tasks
+          .filter((t) => {
+            if (t.done || t.dayKey !== dayKey) return false;
+            if (isBoardDayKey(dayKey)) return t.weekOf === week;
+            return true;
+          })
+          .sort((a, b) => a.rank - b.rank);
+
+        const labelDefs = useSettingsStore.getState().settings.labels ?? [];
+        const labelName = (id: string) =>
+          labelDefs.find((l) => l.id === id)?.name?.toLowerCase() ?? id.toLowerCase();
+
+        const ordered = [...section].sort((a, b) => {
+          if (by === 'priority') {
+            const au = a.urgent ? 0 : 1;
+            const bu = b.urgent ? 0 : 1;
+            if (au !== bu) return au - bu;
+            const qa = quadrant(a);
+            const qb = quadrant(b);
+            if (qa === null && qb === null) return a.rank - b.rank;
+            if (qa === null) return 1;
+            if (qb === null) return -1;
+            const oa = QUADRANT_ORDER[qa];
+            const ob = QUADRANT_ORDER[qb];
+            return oa !== ob ? oa - ob : a.rank - b.rank;
+          }
+
+          if (by === 'labels') {
+            const aHas = a.labels.length > 0 ? 0 : 1;
+            const bHas = b.labels.length > 0 ? 0 : 1;
+            if (aHas !== bHas) return aHas - bHas;
+            const aKey = [...a.labels].map(labelName).sort()[0] ?? '';
+            const bKey = [...b.labels].map(labelName).sort()[0] ?? '';
+            const cmp = aKey.localeCompare(bKey, 'nl');
+            return cmp !== 0 ? cmp : a.rank - b.rank;
+          }
+
+          // estimate — kortste eerst; zonder schatting onderaan
+          const ae = a.estimateMin;
+          const be = b.estimateMin;
+          if (ae === null && be === null) return a.rank - b.rank;
+          if (ae === null) return 1;
+          if (be === null) return -1;
+          return ae !== be ? ae - be : a.rank - b.rank;
+        });
+
+        const patches = new Map<string, { rank: number; daypart: null }>();
+        ordered.forEach((t, i) => patches.set(t.id, { rank: (i + 1) * RANK_STEP, daypart: null }));
+
+        const prev = state.tasks;
+        const next = prev.map((t) =>
+          patches.has(t.id) ? touch({ ...t, ...patches.get(t.id) }) : t,
+        );
+
+        const sortSnapshots = { ...state.sortSnapshots };
+        if (!sortSnapshots[snapKey]) {
+          sortSnapshots[snapKey] = section.map((t) => ({
+            id: t.id,
+            rank: t.rank,
+            daypart: t.daypart,
+          }));
         }
 
-        const parts: (Daypart | null)[] = [null, 'ochtend', 'dag', 'avond'];
-        const partIndex = parts.indexOf(task.daypart);
-        if (partIndex === -1) return;
-        const nextPartIndex = partIndex + direction;
-        if (nextPartIndex < 0 || nextPartIndex >= parts.length) return;
+        set({ tasks: next, sortSnapshots });
+        syncTasks(
+          next.filter((t) => patches.has(t.id)),
+          () => set({ tasks: prev, sortSnapshots: state.sortSnapshots }),
+        );
+      },
 
-        const nextPart = parts[nextPartIndex];
-        const targetLen = state.tasks.filter(
-          (t) =>
-            !t.done &&
-            sameSection(
-              t,
-              task.dayKey,
-              nextPart,
-              isBoardDayKey(task.dayKey) ? task.weekOf : undefined,
-            ),
-        ).length;
-        const index = direction === -1 ? targetLen : 0;
-        get().moveTask(id, task.dayKey, nextPart, index, task.weekOf);
+      clearColumnSort: (dayKey, columnWeekOf) => {
+        const state = get();
+        const week = columnWeekOf ?? weekOf();
+        const snapKey = quickWinBundleKey(dayKey, week);
+        const snap = state.sortSnapshots[snapKey];
+        if (!snap?.length) return;
+
+        const byId = new Map(snap.map((e) => [e.id, e]));
+        const prev = state.tasks;
+        const next = prev.map((t) => {
+          const entry = byId.get(t.id);
+          if (!entry) return t;
+          return touch({ ...t, rank: entry.rank, daypart: entry.daypart });
+        });
+        const nextSnapshots = { ...state.sortSnapshots };
+        delete nextSnapshots[snapKey];
+        set({ tasks: next, sortSnapshots: nextSnapshots });
+        syncTasks(
+          next.filter((t, i) => t !== prev[i]),
+          () => set({ tasks: prev, sortSnapshots: state.sortSnapshots }),
+        );
       },
 
       sortColumnByPriority: (dayKey, columnWeekOf) => {
-        const state = get();
-        const week = columnWeekOf ?? weekOf();
-        const patches = new Map<string, number>();
-        for (const daypart of [null, 'ochtend', 'dag', 'avond'] as (Daypart | null)[]) {
-          const section = state.tasks
-            .filter(
-              (t) =>
-                !t.done &&
-                sameSection(t, dayKey, daypart, isBoardDayKey(dayKey) ? week : undefined),
-            )
-            .sort((a, b) => a.rank - b.rank);
-          const rated = section.filter((t) => quadrant(t) !== null);
-          const unrated = section.filter((t) => quadrant(t) === null);
-          rated.sort((a, b) => {
-            const qa = QUADRANT_ORDER[quadrant(a) as NonNullable<Quadrant>];
-            const qb = QUADRANT_ORDER[quadrant(b) as NonNullable<Quadrant>];
-            return qa !== qb ? qa - qb : a.rank - b.rank;
-          });
-          [...rated, ...unrated].forEach((t, i) => patches.set(t.id, (i + 1) * RANK_STEP));
-        }
-        const prev = state.tasks;
-        const next = prev.map((t) =>
-          patches.has(t.id) ? touch({ ...t, rank: patches.get(t.id) as number }) : t,
-        );
-        set({ tasks: next });
-        syncTasks(
-          next.filter((t) => patches.has(t.id)),
-          () => set({ tasks: prev }),
-        );
+        get().sortColumn(dayKey, 'priority', columnWeekOf);
       },
 
       moveAllToTomorrow: (dateISO) => {
@@ -528,8 +583,15 @@ export const useBoardStore = create<BoardState>()(
           tasks: migrateTasks(p.tasks ?? current.tasks),
           dayStates: p.dayStates ?? current.dayStates,
           quickWinBundles: migrateBundles(p.quickWinBundles ?? []),
+          sortSnapshots: p.sortSnapshots ?? {},
         };
       },
+      partialize: (state) => ({
+        tasks: state.tasks,
+        dayStates: state.dayStates,
+        quickWinBundles: state.quickWinBundles,
+        sortSnapshots: state.sortSnapshots,
+      }),
     },
   ),
 );

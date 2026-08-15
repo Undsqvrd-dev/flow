@@ -1,12 +1,12 @@
 'use client';
 
 import type { Task } from '@/lib/types';
-import { Segmented } from '@/components/ui/segmented';
+import { Bell } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useGoalsStore, activeGoals } from '@/stores/useGoalsStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
-import { DAY_LABELS, DAYPART_LABELS, DAYPARTS, WEEKDAY_KEYS, isBoardDayKey, weekOfNearestDayKey } from '@/lib/dates';
+import { DAY_LABELS, WEEKDAY_KEYS, isBoardDayKey, weekOfNearestDayKey } from '@/lib/dates';
 import type { BoardDayKey, DayKey } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -61,9 +61,7 @@ export function CardSidePanel({ task }: { task: Task }) {
             const dayKey = e.target.value as DayKey;
             const patch: Partial<Task> = {
               dayKey,
-              daypart: dayKey === 'algemeen' || dayKey === 'dump' || dayKey === 'wachtruimte' || dayKey === 'gedaan'
-                ? null
-                : task.daypart,
+              daypart: null,
             };
             if (isBoardDayKey(dayKey)) {
               patch.weekOf = weekOfNearestDayKey(dayKey as BoardDayKey);
@@ -78,13 +76,26 @@ export function CardSidePanel({ task }: { task: Task }) {
         </select>
       </Section>
 
-      <Section label="Dagdeel">
-        <Segmented
-          options={DAYPARTS.map((d) => ({ value: d, label: DAYPART_LABELS[d] }))}
-          value={task.daypart}
-          onChange={(v) => updateTask(task.id, { daypart: v })}
-          className="w-full [&>button]:flex-1"
-        />
+      <Section label="Prioriteit">
+        <button
+          type="button"
+          onClick={() =>
+            updateTask(task.id, {
+              urgent: task.urgent ? null : true,
+              important: task.urgent ? null : true,
+            })
+          }
+          className={cn(
+            'inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2',
+            'text-[13px] font-medium transition-colors duration-150 cursor-pointer',
+            task.urgent
+              ? 'border-red/40 bg-red/10 text-red'
+              : 'border-line bg-surface text-txt-2 hover:border-line-2',
+          )}
+        >
+          <Bell size={15} strokeWidth={1.75} className={cn(task.urgent && 'fill-red')} />
+          {task.urgent ? 'Prioriteit aan' : 'Prioriteit'}
+        </button>
       </Section>
 
       <Section label="Tijdsschatting">
