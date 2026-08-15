@@ -58,6 +58,13 @@ interface BoardState {
     index: number,
     targetWeekOf?: string,
   ) => void;
+  /** Verplaats alle QuickWin-taken van een dagbundel naar een andere dag. */
+  moveQuickWinBundle: (
+    fromDayKey: DayKey,
+    fromWeekOf: string,
+    toDayKey: DayKey,
+    toWeekOf: string,
+  ) => void;
   moveRank: (id: string, direction: -1 | 1) => void;
   sortColumnByPriority: (dayKey: DayKey, columnWeekOf?: string) => void;
   /** Verplaats alle open taken van deze kalenderdatum naar morgen. */
@@ -260,6 +267,64 @@ export const useBoardStore = create<BoardState>()(
         set({ tasks: next });
         const changed = next.filter((t) => patches.has(t.id));
         syncTasks(changed, () => set({ tasks: prev }));
+      },
+
+      moveQuickWinBundle: (fromDayKey, fromWeekOf, toDayKey, toWeekOf) => {
+        if (toDayKey === 'gedaan' || toDayKey === 'dump') return;
+        if (fromDayKey === toDayKey && fromWeekOf === toWeekOf) return;
+
+        const threshold = useSettingsStore.getState().settings.quickWinThresholdMin;
+        const state = get();
+        const moving = quickWinsForDay(state.tasks, fromDayKey, threshold, fromWeekOf);
+        if (moving.length === 0) return;
+
+        const prevTasks = state.tasks;
+        const prevBundles = state.quickWinBundles;
+        const moveIds = new Set(moving.map((t) => t.id));
+        const targetWeek = isBoardDayKey(toDayKey) ? toWeekOf : weekOf();
+
+        const existingOnTarget = prevTasks
+          .filter(
+            (t) =>
+              !t.done &&
+              !moveIds.has(t.id) &&
+              sameSection(t, toDayKey, null, isBoardDayKey(toDayKey) ? targetWeek : undefined),
+          )
+          .sort((a, b) => a.rank - b.rank);
+
+        let rank = existingOnTarget.length
+          ? Math.max(...existingOnTarget.map((t) => t.rank))
+          : 0;
+
+        const nextTasks = prevTasks.map((t) => {
+          if (!moveIds.has(t.id)) return t;
+          rank += RANK_STEP;
+          return touch({
+            ...t,
+            dayKey: toDayKey,
+            daypart: null,
+            weekOf: targetWeek,
+            rank,
+          });
+        });
+
+        const fromKey = quickWinBundleKey(fromDayKey, fromWeekOf);
+        const toKey = quickWinBundleKey(toDayKey, targetWeek);
+        let nextBundles = prevBundles.filter((k) => k !== fromKey);
+        if (!nextBundles.includes(toKey)) nextBundles = [...nextBundles, toKey];
+
+        set({ tasks: nextTasks, quickWinBundles: nextBundles });
+        setQuickWinBundleCache(nextBundles);
+
+        const changed = nextTasks.filter((t) => moveIds.has(t.id));
+        syncTasks(changed, () => {
+          set({ tasks: prevTasks, quickWinBundles: prevBundles });
+          setQuickWinBundleCache(prevBundles);
+        });
+        syncSettingsData(useSettingsStore.getState().settings, nextBundles, () => {
+          set({ quickWinBundles: prevBundles });
+          setQuickWinBundleCache(prevBundles);
+        });
       },
 
       moveRank: (id, direction) => {

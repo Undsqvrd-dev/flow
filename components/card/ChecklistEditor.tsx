@@ -1,26 +1,54 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CheckSquare, Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
 import type { ChecklistItem } from '@/lib/types';
 import { ProgressBar } from '@/components/ui/progress';
-import { nextRank, uid, cn } from '@/lib/utils';
+import { SortableChecklistItem } from './SortableChecklistItem';
+import { RANK_STEP, nextRank, uid, cn } from '@/lib/utils';
 
-/** Checklist met voortgangsbalk; items zijn inline bewerkbaar. */
-export function ChecklistEditor({ items, onChange }: {
+/** Checklist met voortgangsbalk, slepen en inline bewerken. */
+export function ChecklistEditor({
+  items,
+  onChange,
+}: {
   items: ChecklistItem[];
   onChange: (items: ChecklistItem[]) => void;
 }) {
   const [draft, setDraft] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [hideDone, setHideDone] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
+
   const sorted = [...items].sort((a, b) => a.rank - b.rank);
   const done = items.filter((i) => i.done).length;
+  const visible = hideDone ? sorted.filter((i) => !i.done) : sorted;
+  const pct = items.length === 0 ? 0 : (done / items.length) * 100;
 
   function add() {
     const text = draft.trim();
     if (!text) return;
-    onChange([...items, { id: uid(), text, done: false, rank: nextRank(items.map((i) => i.rank)) }]);
+    onChange([
+      ...items,
+      { id: uid(), text, done: false, rank: nextRank(items.map((i) => i.rank)) },
+    ]);
     setDraft('');
   }
 
@@ -32,78 +60,119 @@ export function ChecklistEditor({ items, onChange }: {
     onChange(items.filter((i) => i.id !== id));
   }
 
-  function startEdit(item: ChecklistItem) {
-    setEditingId(item.id);
-    setEditText(item.text);
+  function clearAll() {
+    if (items.length === 0) return;
+    if (!window.confirm('Hele checklist verwijderen?')) return;
+    onChange([]);
+    setHideDone(false);
   }
 
   function commitEdit() {
     if (!editingId) return;
     const text = editText.trim();
-    if (!text) {
-      remove(editingId);
-    } else {
-      onChange(items.map((i) => (i.id === editingId ? { ...i, text } : i)));
-    }
+    if (!text) remove(editingId);
+    else onChange(items.map((i) => (i.id === editingId ? { ...i, text } : i)));
     setEditingId(null);
     setEditText('');
   }
 
+  function onDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = visible.findIndex((i) => i.id === active.id);
+    const newIndex = visible.findIndex((i) => i.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const moved = arrayMove(visible, oldIndex, newIndex);
+    let next: ChecklistItem[];
+    if (!hideDone) {
+      next = moved;
+    } else {
+      let vi = 0;
+      next = sorted.map((item) => (item.done ? item : moved[vi++]));
+    }
+    onChange(next.map((item, i) => ({ ...item, rank: (i + 1) * RANK_STEP })));
+  }
+
   return (
     <div>
-      {items.length > 0 && (
-        <div className="mb-2 flex items-center gap-2">
-          <span className="text-[11px] font-semibold tabular-nums text-muted">{done}/{items.length}</span>
-          <ProgressBar value={(done / items.length) * 100} />
-        </div>
-      )}
-      <ul className="flex flex-col gap-0.5">
-        {sorted.map((item) => (
-          <li key={item.id} className="group flex items-center gap-2 rounded-[8px] px-1 py-1 hover:bg-surface-2">
-            <input
-              type="checkbox"
-              checked={item.done}
-              onChange={() => toggle(item.id)}
-              className="h-4 w-4 shrink-0 cursor-pointer accent-(--green)"
-            />
-            {editingId === item.id ? (
-              <input
-                autoFocus
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                onBlur={commitEdit}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitEdit();
-                  if (e.key === 'Escape') {
-                    setEditingId(null);
-                    setEditText('');
-                  }
-                }}
-                className="h-7 min-w-0 flex-1 rounded-[6px] border border-green bg-surface px-2 text-sm text-txt outline-none"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => startEdit(item)}
-                className={cn(
-                  'min-w-0 flex-1 cursor-text rounded-[6px] px-1 py-0.5 text-left text-sm',
-                  item.done ? 'text-muted line-through' : 'text-txt-2',
-                )}
-              >
-                {item.text}
-              </button>
-            )}
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="panel-label !mb-0 inline-flex items-center gap-1.5">
+          <CheckSquare size={13} strokeWidth={1.75} className="text-muted" />
+          Checklist
+        </span>
+        {items.length > 0 && (
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
             <button
               type="button"
-              onClick={() => remove(item.id)}
-              className="invisible text-muted-2 hover:text-red group-hover:visible cursor-pointer"
-              aria-label="Verwijder stap"
+              onClick={() => setHideDone((v) => !v)}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-[8px] border border-line bg-surface-2 px-2 py-1',
+                'text-[11px] font-medium text-txt-2 transition-colors hover:border-line-2 cursor-pointer',
+                hideDone && 'border-green/40 bg-green-50 text-green',
+              )}
             >
-              <X size={14} strokeWidth={1.75} />
+              {hideDone ? <Eye size={12} strokeWidth={1.75} /> : <EyeOff size={12} strokeWidth={1.75} />}
+              {hideDone ? 'Aangevinkte tonen' : 'Aangevinkte verbergen'}
             </button>
-          </li>
-        ))}
-      </ul>
+            <button
+              type="button"
+              onClick={clearAll}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-[8px] border border-line bg-surface-2 px-2 py-1',
+                'text-[11px] font-medium text-txt-2 transition-colors',
+                'hover:border-red/40 hover:bg-red/5 hover:text-red cursor-pointer',
+              )}
+            >
+              <Trash2 size={12} strokeWidth={1.75} />
+              Verwijderen
+            </button>
+          </div>
+        )}
+      </div>
+
+      {items.length > 0 && (
+        <div className="mb-2 flex items-center gap-2">
+          <span className="w-8 shrink-0 text-[11px] font-semibold tabular-nums text-muted">
+            {Math.round(pct)}%
+          </span>
+          <ProgressBar value={pct} />
+        </div>
+      )}
+
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={visible.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+          <ul className="flex flex-col gap-0.5">
+            {visible.map((item) => (
+              <SortableChecklistItem
+                key={item.id}
+                item={item}
+                editing={editingId === item.id}
+                editText={editText}
+                onToggle={() => toggle(item.id)}
+                onRemove={() => remove(item.id)}
+                onStartEdit={() => {
+                  setEditingId(item.id);
+                  setEditText(item.text);
+                }}
+                onEditText={setEditText}
+                onCommitEdit={commitEdit}
+                onCancelEdit={() => {
+                  setEditingId(null);
+                  setEditText('');
+                }}
+              />
+            ))}
+          </ul>
+        </SortableContext>
+      </DndContext>
+
+      {hideDone && done > 0 && (
+        <p className="mt-1 px-1 text-[11px] text-muted">
+          {done} aangevinkte {done === 1 ? 'item' : 'items'} verborgen
+        </p>
+      )}
+
       <div className="mt-1.5 flex items-center gap-2">
         <Plus size={15} strokeWidth={1.75} className="shrink-0 text-muted-2" />
         <input

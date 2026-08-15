@@ -10,17 +10,28 @@ import type { DayKey, Daypart, Task } from '@/lib/types';
 import { Column } from './Column';
 import { TaskCard } from './TaskCard';
 import { WeekTray } from './WeekTray';
+import { QuickWinsCard } from './QuickWinsCard';
 import { parseSectionId } from './PartSection';
 import { FocusBar } from '@/components/focusbar/FocusBar';
-import { useBoardStore, openTasksFor } from '@/stores/useBoardStore';
+import {
+  useBoardStore,
+  openTasksFor,
+  quickWinsForDay,
+} from '@/stores/useBoardStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useUiStore } from '@/stores/useUiStore';
 import { dayKeyFromDate, rollingBoardDates, todayISO } from '@/lib/dates';
+import { parseQuickWinDragId } from '@/lib/quickWinDrag';
 import { cn } from '@/lib/utils';
 
 function targetOf(
   overId: string,
   tasks: Task[],
 ): { dayKey: DayKey; daypart: Daypart | null; index: number; weekOf: string } | null {
+  const qw = parseQuickWinDragId(overId);
+  if (qw) {
+    return { dayKey: qw.dayKey, daypart: null, weekOf: qw.weekOf, index: 0 };
+  }
   const section = parseSectionId(overId);
   if (section) {
     return { ...section, index: Number.MAX_SAFE_INTEGER };
@@ -42,13 +53,19 @@ function targetOf(
   };
 }
 
+type ActiveDrag =
+  | { type: 'task'; task: Task }
+  | { type: 'quickwin'; dayKey: DayKey; weekOf: string; tasks: Task[] };
+
 export function Board() {
   const tasks = useBoardStore((s) => s.tasks);
   const moveTask = useBoardStore((s) => s.moveTask);
+  const moveQuickWinBundle = useBoardStore((s) => s.moveQuickWinBundle);
   const updateTask = useBoardStore((s) => s.updateTask);
   const toggleDone = useBoardStore((s) => s.toggleDone);
+  const threshold = useSettingsStore((s) => s.settings.quickWinThresholdMin);
   const focusMode = useUiStore((s) => s.focusMode);
-  const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
   const today = todayISO();
   const scrollRef = useRef<HTMLDivElement>(null);
   const wasFocusMode = useRef(focusMode);
@@ -129,14 +146,35 @@ export function Board() {
   }, [focusMode, today]);
 
   function onDragStart(e: DragStartEvent) {
-    setActiveTask(tasks.find((t) => t.id === e.active.id) ?? null);
+    const qw = parseQuickWinDragId(String(e.active.id));
+    if (qw) {
+      setActiveDrag({
+        type: 'quickwin',
+        dayKey: qw.dayKey,
+        weekOf: qw.weekOf,
+        tasks: quickWinsForDay(tasks, qw.dayKey, threshold, qw.weekOf),
+      });
+      return;
+    }
+    const task = tasks.find((t) => t.id === e.active.id);
+    setActiveDrag(task ? { type: 'task', task } : null);
   }
 
   function onDragEnd(e: DragEndEvent) {
-    setActiveTask(null);
     const { active, over } = e;
+    const drag = activeDrag;
+    setActiveDrag(null);
     if (!over) return;
-    const task = tasks.find((t) => t.id === active.id);
+
+    const qw = parseQuickWinDragId(String(active.id));
+    if (qw) {
+      const target = targetOf(String(over.id), tasks);
+      if (!target || target.dayKey === 'gedaan') return;
+      moveQuickWinBundle(qw.dayKey, qw.weekOf, target.dayKey, target.weekOf);
+      return;
+    }
+
+    const task = tasks.find((t) => t.id === active.id) ?? (drag?.type === 'task' ? drag.task : null);
     if (!task) return;
     const target = targetOf(String(over.id), tasks);
     if (!target) return;
@@ -179,9 +217,18 @@ export function Board() {
           </div>
         </div>
         <DragOverlay>
-          {activeTask ? (
+          {activeDrag?.type === 'task' ? (
             <div className={cn('rotate-2 opacity-95', focusMode ? 'w-[min(520px,100%)] max-w-[90vw]' : 'w-[248px]')}>
-              <TaskCard task={activeTask} sortable={false} />
+              <TaskCard task={activeDrag.task} sortable={false} />
+            </div>
+          ) : activeDrag?.type === 'quickwin' ? (
+            <div className="w-[248px]">
+              <QuickWinsCard
+                tasks={activeDrag.tasks}
+                dayKey={activeDrag.dayKey}
+                weekOf={activeDrag.weekOf}
+                overlay
+              />
             </div>
           ) : null}
         </DragOverlay>

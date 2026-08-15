@@ -120,7 +120,6 @@ export function CardModal() {
               </section>
 
               <section>
-                <p className="panel-label mb-2">Checklist</p>
                 <ChecklistEditor
                   items={t.checklist}
                   onChange={(checklist) => updateTask(t.id, { checklist })}

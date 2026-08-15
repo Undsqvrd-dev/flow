@@ -2,30 +2,43 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDraggable } from '@dnd-kit/core';
 import { Zap, Play, UnfoldVertical, ChevronDown } from 'lucide-react';
 import type { DayKey, Task } from '@/lib/types';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { usePomodoroStore } from '@/stores/usePomodoroStore';
+import { quickWinDragId } from '@/lib/quickWinDrag';
+import { weekOf } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 
 /**
  * Compacte batchkaart bovenaan de dagkolom: alle korte taken van die dag.
- * Nieuwe taken ≤ drempel sluiten automatisch aan zolang de bundel actief is.
+ * Sleepbaar naar een andere dagkolom.
  */
 export function QuickWinsCard({
   tasks,
   dayKey,
   weekOf: columnWeekOf,
+  overlay = false,
 }: {
   tasks: Task[];
   dayKey: DayKey;
   weekOf?: string;
+  /** Alleen visueel in DragOverlay — geen interactie. */
+  overlay?: boolean;
 }) {
   const router = useRouter();
   const toggleDone = useBoardStore((s) => s.toggleDone);
   const disableBundle = useBoardStore((s) => s.disableQuickWinBundle);
   const start = usePomodoroStore((s) => s.start);
   const [open, setOpen] = useState(false);
+  const columnWeek = columnWeekOf ?? weekOf();
+
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: quickWinDragId(dayKey, columnWeek),
+    data: { type: 'quickwin-bundle', dayKey, weekOf: columnWeek },
+    disabled: overlay,
+  });
 
   const totalMin = tasks.reduce((sum, t) => sum + (t.estimateMin ?? 0), 0);
   const batchMin = Math.max(5, Math.ceil(totalMin / 5) * 5);
@@ -36,11 +49,20 @@ export function QuickWinsCard({
   }
 
   return (
-    <div className="rounded-card border border-green-200 bg-green-50 shadow-soft-sm dark:border-green-700/50">
+    <div
+      ref={overlay ? undefined : setNodeRef}
+      className={cn(
+        'rounded-card border border-green-200 bg-green-50 shadow-soft-sm dark:border-green-700/50',
+        !overlay && 'cursor-grab active:cursor-grabbing touch-none',
+        isDragging && 'opacity-40',
+        overlay && 'rotate-2 shadow-soft-lg',
+      )}
+      {...(overlay ? {} : { ...attributes, ...listeners })}
+    >
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left cursor-pointer"
+        onClick={() => !overlay && setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-left cursor-grab"
       >
         <Zap size={13} strokeWidth={2} className="shrink-0 text-green" />
         <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-txt">
@@ -56,8 +78,11 @@ export function QuickWinsCard({
         />
       </button>
 
-      {open && (
-        <div className="border-t border-green-200/70 px-3 pb-3 pt-2 dark:border-green-700/40">
+      {open && !overlay && (
+        <div
+          className="border-t border-green-200/70 px-3 pb-3 pt-2 dark:border-green-700/40"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           <ul className="mb-2.5 flex flex-col gap-1">
             {tasks.map((t) => (
               <li key={t.id} className="flex items-center gap-2">
@@ -67,7 +92,12 @@ export function QuickWinsCard({
                   onChange={() => toggleDone(t.id)}
                   className="h-3.5 w-3.5 cursor-pointer accent-(--green)"
                 />
-                <span className={cn('flex-1 truncate text-[12.5px] text-txt-2', t.done && 'text-muted line-through')}>
+                <span
+                  className={cn(
+                    'flex-1 truncate text-[12.5px] text-txt-2',
+                    t.done && 'text-muted line-through',
+                  )}
+                >
                   {t.title}
                 </span>
                 <span className="text-[10px] tabular-nums text-muted-2">{t.estimateMin}m</span>

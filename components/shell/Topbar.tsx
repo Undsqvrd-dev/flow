@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Plus, Focus as FocusIcon, Lightbulb, Leaf } from 'lucide-react';
+import { Plus, Focus as FocusIcon, Lightbulb, Leaf, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
+import { forcePushLocalToRemote } from '@/lib/db/bootstrap';
 import { useUiStore } from '@/stores/useUiStore';
 import { cn } from '@/lib/utils';
 import { longDate } from '@/lib/dates';
@@ -30,6 +31,8 @@ export function Topbar() {
   const setQuickCaptureOpen = useUiStore((s) => s.setQuickCaptureOpen);
   const setMobileNavOpen = useUiStore((s) => s.setMobileNavOpen);
   const [todayLabel, setTodayLabel] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncHint, setSyncHint] = useState('Sync naar cloud');
 
   useEffect(() => {
     setTodayLabel(longDate(new Date()));
@@ -42,6 +45,21 @@ export function Topbar() {
     }
     setFocusMode(true);
     router.push('/board');
+  }
+
+  async function syncNow() {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncHint('Bezig…');
+    try {
+      const { taskCount } = await forcePushLocalToRemote();
+      setSyncHint(`${taskCount} taken gesynchroniseerd`);
+    } catch {
+      setSyncHint('Sync mislukt');
+    } finally {
+      setSyncing(false);
+      window.setTimeout(() => setSyncHint('Sync naar cloud'), 2500);
+    }
   }
 
   return (
@@ -64,6 +82,21 @@ export function Topbar() {
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <Tooltip content={syncHint}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={syncNow}
+            disabled={syncing}
+            aria-label="Sync naar cloud"
+          >
+            <RefreshCw
+              size={17}
+              strokeWidth={1.75}
+              className={cn(syncing && 'animate-spin text-green')}
+            />
+          </Button>
+        </Tooltip>
         <Tooltip content="Inspiratie (⌘I)">
           <Button
             variant="ghost"
