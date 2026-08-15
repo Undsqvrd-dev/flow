@@ -8,7 +8,8 @@ import { GlobalHotkeys } from './GlobalHotkeys';
 import { NewTaskDialog } from './NewTaskDialog';
 import { QuickCapture } from './QuickCapture';
 import { CardModal } from '@/components/card/CardModal';
-import { bootstrapData } from '@/lib/db/bootstrap';
+import { bootstrapData, forcePushLocalToRemote } from '@/lib/db/bootstrap';
+import { syncEnabled } from '@/lib/db/enabled';
 import { useBoardStore } from '@/stores/useBoardStore';
 
 /**
@@ -17,6 +18,7 @@ import { useBoardStore } from '@/stores/useBoardStore';
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
+  const [syncOk, setSyncOk] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,7 +26,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       await bootstrapData();
       if (cancelled) return;
       useBoardStore.getState().rollover();
+      setSyncOk(syncEnabled());
       setReady(true);
+      (
+        window as unknown as { __flowForcePush?: typeof forcePushLocalToRemote }
+      ).__flowForcePush = forcePushLocalToRemote;
     })();
     return () => {
       cancelled = true;
@@ -36,6 +42,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
+        {ready && !syncOk && (
+          <div className="border-b border-amber/30 bg-amber/10 px-4 py-2 text-[12px] text-txt-2">
+            Cloud-sync is niet actief — wijzigingen blijven voorlopig alleen op dit apparaat.
+            Vernieuw de pagina of check je login.
+          </div>
+        )}
         <main className="min-h-0 flex-1 overflow-y-auto">
           {ready ? children : null}
         </main>

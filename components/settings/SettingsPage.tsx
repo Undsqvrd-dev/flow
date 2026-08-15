@@ -16,7 +16,42 @@ import { uid, cn } from '@/lib/utils';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { SignOutButton } from '@/components/auth/SignOutButton';
 import { MoodboardEditor } from '@/components/settings/MoodboardEditor';
+import { forcePushLocalToRemote } from '@/lib/db/bootstrap';
+import { syncEnabled } from '@/lib/db/enabled';
 import type { Settings } from '@/lib/types';
+
+function SyncPanel() {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const taskCount = useBoardStore((s) => s.tasks.length);
+
+  async function pushNow() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const { taskCount: n } = await forcePushLocalToRemote();
+      setMessage(`${n} taken naar de cloud geschreven.`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Sync mislukt');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-[12px] text-muted">
+        Sync-status: {syncEnabled() ? 'actief' : 'niet actief'}. Dit apparaat heeft nu{' '}
+        {taskCount} taken in de cache. Gebruik de knop hieronder als mobiel/andere tabs
+        achterlopen.
+      </p>
+      <Button variant="secondary" size="sm" onClick={pushNow} disabled={busy} className="self-start">
+        {busy ? 'Bezig…' : 'Lokale taken nu naar cloud syncen'}
+      </Button>
+      {message && <p className="text-[12px] text-txt-2">{message}</p>}
+    </div>
+  );
+}
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -257,6 +292,10 @@ export function SettingsPage() {
 
         <Panel title="Migratie">
           <TrelloImport />
+        </Panel>
+
+        <Panel title="Cloud-sync">
+          <SyncPanel />
         </Panel>
 
         <Panel title="Account">

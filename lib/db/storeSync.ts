@@ -27,7 +27,10 @@ import type {
 } from '@/lib/types';
 
 export function syncTasks(tasks: Task[], rollback: () => void): void {
-  if (!syncEnabled()) return;
+  if (!syncEnabled()) {
+    console.warn('[flow sync] taken niet naar Supabase — sync nog niet klaar');
+    return;
+  }
   runSync(() => upsertTasks(tasks), rollback);
 }
 
