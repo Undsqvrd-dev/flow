@@ -22,6 +22,8 @@ import { DAY_LABELS, WEEKDAY_KEYS, weekOfNearestDayKey } from '@/lib/dates';
 import type { BoardDayKey, DayKey } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
+const ESTIMATES = [1, 3, 5, 15, 30, 60, 120];
+
 /** Snelmenu à la Trello bij rechtermuisklik op een kaart. */
 export function TaskCardContextMenu({
   task,
@@ -72,6 +74,34 @@ export function TaskCardContextMenu({
         <Bell size={14} strokeWidth={1.75} className={cn(task.urgent && 'fill-red text-red')} />
         {task.urgent ? 'Prioriteit uit' : 'Prioriteit aan'}
       </ContextMenuItem>
+
+      <ContextMenuSeparator />
+      <p className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
+        Tijdsduur
+      </p>
+      <div className="flex flex-wrap gap-1 px-1.5 pb-1">
+        {ESTIMATES.map((min) => {
+          const active = task.estimateMin === min;
+          return (
+            <button
+              key={min}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                run(() => updateTask(task.id, { estimateMin: active ? null : min }));
+              }}
+              className={cn(
+                'rounded-pill border px-2 py-0.5 text-[12px] font-medium transition-colors duration-150 cursor-pointer',
+                active
+                  ? 'border-green bg-green-50 text-green'
+                  : 'border-line text-txt-2 hover:border-line-2',
+              )}
+            >
+              {min}m
+            </button>
+          );
+        })}
+      </div>
 
       {labelDefs.length > 0 && (
         <>
