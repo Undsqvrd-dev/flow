@@ -7,6 +7,7 @@ import { Zap, Play, UnfoldVertical, ChevronDown } from 'lucide-react';
 import type { DayKey, Task } from '@/lib/types';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { usePomodoroStore } from '@/stores/usePomodoroStore';
+import { useUiStore } from '@/stores/useUiStore';
 import { quickWinDragId } from '@/lib/quickWinDrag';
 import { weekOf } from '@/lib/dates';
 import { cn } from '@/lib/utils';
@@ -30,6 +31,7 @@ export function QuickWinsCard({
   const router = useRouter();
   const toggleDone = useBoardStore((s) => s.toggleDone);
   const disableBundle = useBoardStore((s) => s.disableQuickWinBundle);
+  const openTask = useUiStore((s) => s.openTask);
   const start = usePomodoroStore((s) => s.start);
   const [open, setOpen] = useState(false);
   const columnWeek = columnWeekOf ?? weekOf();
@@ -92,14 +94,16 @@ export function QuickWinsCard({
                   onChange={() => toggleDone(t.id)}
                   className="h-3.5 w-3.5 cursor-pointer accent-(--green)"
                 />
-                <span
+                <button
+                  type="button"
+                  onClick={() => openTask(t.id)}
                   className={cn(
-                    'flex-1 truncate text-[12.5px] text-txt-2',
+                    'min-w-0 flex-1 truncate text-left text-[12.5px] text-txt-2 hover:text-txt cursor-pointer',
                     t.done && 'text-muted line-through',
                   )}
                 >
                   {t.title}
-                </span>
+                </button>
                 <span className="text-[10px] tabular-nums text-muted-2">{t.estimateMin}m</span>
               </li>
             ))}

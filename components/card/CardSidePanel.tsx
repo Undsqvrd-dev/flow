@@ -138,7 +138,7 @@ export function CardSidePanel({ task }: { task: Task }) {
                   }
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-[12px] font-medium transition-colors duration-150 cursor-pointer',
-                    active ? 'ring-2 ring-offset-1 ring-offset-surface' : 'opacity-70 hover:opacity-100',
+                    active ? 'ring-1' : 'opacity-70 hover:opacity-100',
                   )}
                   style={{
                     backgroundColor: `${label.color}22`,
