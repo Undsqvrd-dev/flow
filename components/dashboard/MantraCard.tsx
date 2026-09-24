@@ -17,7 +17,7 @@ export function MantraCard({ fill = false }: { fill?: boolean }) {
         fill ? 'h-full min-h-[180px]' : 'min-h-[180px]',
       )}
     >
-      <p className="text-[20px] font-bold leading-snug tracking-tight text-txt md:text-[26px]">
+      <p className="text-[20px] font-normal leading-snug tracking-tight text-txt md:text-[26px]">
         “{mantra}”
       </p>
       {values.length > 0 && (

@@ -8,6 +8,7 @@ import { ProgressBar } from '@/components/ui/progress';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useGoalsStore } from '@/stores/useGoalsStore';
 import { daysUntil, weekOf } from '@/lib/dates';
+import { fireConfetti } from '@/lib/confetti';
 
 export function GoalCard({ goal }: { goal: Goal }) {
   const tasks = useBoardStore((s) => s.tasks);
@@ -21,6 +22,13 @@ export function GoalCard({ goal }: { goal: Goal }) {
   const pct = goal.targetValue
     ? Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100))
     : null;
+
+  function bump(delta: number) {
+    incrementGoal(goal.id, delta);
+    if (delta > 0 && (goal.horizon === 'maand' || goal.horizon === 'jaar')) {
+      fireConfetti();
+    }
+  }
 
   return (
     <>
@@ -65,12 +73,12 @@ export function GoalCard({ goal }: { goal: Goal }) {
             <span
               role="button"
               tabIndex={0}
-              onClick={(e) => { e.stopPropagation(); incrementGoal(goal.id, -1); }}
+              onClick={(e) => { e.stopPropagation(); bump(-1); }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
                   e.stopPropagation();
-                  incrementGoal(goal.id, -1);
+                  bump(-1);
                 }
               }}
               className="rounded-[6px] p-1 text-muted hover:bg-surface-3 hover:text-txt cursor-pointer"
@@ -81,12 +89,12 @@ export function GoalCard({ goal }: { goal: Goal }) {
             <span
               role="button"
               tabIndex={0}
-              onClick={(e) => { e.stopPropagation(); incrementGoal(goal.id, 1); }}
+              onClick={(e) => { e.stopPropagation(); bump(1); }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
                   e.stopPropagation();
-                  incrementGoal(goal.id, 1);
+                  bump(1);
                 }
               }}
               className="rounded-[6px] p-1 text-muted hover:bg-surface-3 hover:text-green cursor-pointer"

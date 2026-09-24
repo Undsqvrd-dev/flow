@@ -8,6 +8,7 @@ import { GlobalHotkeys } from './GlobalHotkeys';
 import { NewTaskDialog } from './NewTaskDialog';
 import { QuickCapture } from './QuickCapture';
 import { CardModal } from '@/components/card/CardModal';
+import { ConfettiOverlay } from '@/components/ui/ConfettiOverlay';
 import { bootstrapData, forcePushLocalToRemote } from '@/lib/db/bootstrap';
 import { syncEnabled } from '@/lib/db/enabled';
 import { useBoardStore } from '@/stores/useBoardStore';
@@ -59,6 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <NewTaskDialog />
           <QuickCapture />
           <CardModal />
+          <ConfettiOverlay />
         </>
       )}
     </div>

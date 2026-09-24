@@ -87,7 +87,7 @@ interface BoardState {
   enableQuickWinBundle: (dayKey: DayKey, columnWeekOf?: string) => void;
   disableQuickWinBundle: (dayKey: DayKey, columnWeekOf?: string) => void;
 
-  /** Weekrollover: sticky borddagen blijven; overige open taken vorige weken → algemeen. */
+  /** Weekrollover: sticky borddagen + dump/wachtruimte blijven; overige → algemeen. */
   rollover: () => void;
 }
 
@@ -551,6 +551,7 @@ export const useBoardStore = create<BoardState>()(
         });
       },
 
+      /** Weekrollover: sticky borddagen + dump/wachtruimte blijven; overige → algemeen. */
       rollover: () => {
         const current = weekOf();
         const prev = get().tasks;
@@ -559,6 +560,8 @@ export const useBoardStore = create<BoardState>()(
           if (t.done) return t;
           // Borddagen blijven sticky zichtbaar tot leeg.
           if (isBoardDayKey(t.dayKey)) return t;
+          // Inspiratie & wachtruimte blijven liggen tot de gebruiker ze verplaatst.
+          if (t.dayKey === 'dump' || t.dayKey === 'wachtruimte') return t;
           if (t.dayKey === 'algemeen') return { ...t, weekOf: current };
           return touch({
             ...t,

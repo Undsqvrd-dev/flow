@@ -26,23 +26,29 @@ export function QuickCapture() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent title="Inspiratie" hideClose>
-        <div className="p-4">
+        <form
+          className="p-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
           <p className="panel-label mb-2.5">Inspiratie</p>
           <Input
             autoFocus
             value={body}
             onChange={(e) => setBody(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') submit();
               if (e.key === 'Escape') setOpen(false);
             }}
+            enterKeyHint="done"
             placeholder="Idee vastleggen — Enter opent de kaart…"
             className="h-11 text-[15px]"
           />
           <p className="mt-2 text-[12px] text-muted">
             Enter om aan te maken · Esc om te sluiten · ⌘I
           </p>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -4,6 +4,7 @@ import { Minus, Target } from 'lucide-react';
 import Link from 'next/link';
 import type { Goal } from '@/lib/types';
 import { ProgressBar } from '@/components/ui/progress';
+import { fireConfetti } from '@/lib/confetti';
 import { useGoalsStore } from '@/stores/useGoalsStore';
 import { cn } from '@/lib/utils';
 
@@ -78,7 +79,10 @@ export function GoalProgressCard({
                 </button>
                 <button
                   type="button"
-                  onClick={() => incrementGoal(goal.id, 1)}
+                  onClick={() => {
+                    incrementGoal(goal.id, 1);
+                    fireConfetti();
+                  }}
                   className={cn(
                     'inline-flex h-8 w-8 items-center justify-center rounded-pill border border-line bg-surface',
                     'text-[14px] leading-none hover:bg-surface-2 cursor-pointer',

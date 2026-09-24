@@ -35,3 +35,8 @@ export function formatMinutes(min: number): string {
   const m = min % 60;
   return m === 0 ? `${h} u` : `${h} u ${m} min`;
 }
+
+/** Tailwind `md`-grens — zelfde als MobileNav (`md:hidden`). */
+export function isMobileViewport(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+}

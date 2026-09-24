@@ -65,17 +65,27 @@ export function AddTaskInline({
   }
 
   return (
-    <input
-      autoFocus
-      value={title}
-      onChange={(e) => setTitle(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') submit();
-        if (e.key === 'Escape') close();
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
       }}
-      onBlur={() => submit()}
-      placeholder="Titel + Enter"
-      className="h-9 w-full rounded-card border border-green bg-surface px-3 text-[13px] text-txt outline-none placeholder:text-muted-2"
-    />
+    >
+      <input
+        autoFocus
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            close();
+          }
+        }}
+        onBlur={() => submit()}
+        enterKeyHint="done"
+        placeholder="Titel + Enter"
+        className="h-9 w-full rounded-card border border-green bg-surface px-3 text-[13px] text-txt outline-none placeholder:text-muted-2"
+      />
+    </form>
   );
 }

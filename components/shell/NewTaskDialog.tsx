@@ -33,13 +33,19 @@ export function NewTaskDialog() {
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) setOpen(false); }}>
       <DialogContent title="Nieuwe taak">
-        <div className="p-5">
+        <form
+          className="p-5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
           <p className="panel-label mb-3">Nieuwe taak</p>
           <Input
             autoFocus
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            enterKeyHint="done"
             placeholder="Wat moet er gebeuren?"
             className="h-11 text-[15px]"
           />
@@ -49,10 +55,10 @@ export function NewTaskDialog() {
             <span className="font-medium text-txt-2">Dag</span>
           </p>
           <div className="mt-5 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setOpen(false)}>Annuleren</Button>
-            <Button variant="primary" onClick={submit} disabled={!title.trim()}>Toevoegen</Button>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Annuleren</Button>
+            <Button type="submit" variant="primary" disabled={!title.trim()}>Toevoegen</Button>
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

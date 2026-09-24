@@ -11,7 +11,7 @@ import { useGoalsStore, goalById } from '@/stores/useGoalsStore';
 import { useSettingsStore, labelById } from '@/stores/useSettingsStore';
 import { useFocusStore, currentFocus } from '@/stores/useFocusStore';
 import { useUiStore } from '@/stores/useUiStore';
-import { cn, formatMinutes } from '@/lib/utils';
+import { cn, formatMinutes, isMobileViewport } from '@/lib/utils';
 
 function LabelDots({ labels }: { labels: { id: string; name: string; color: string }[] }) {
   if (labels.length === 0) return null;
@@ -55,7 +55,6 @@ export function TaskCard({ task, sortable = true }: { task: Task; sortable?: boo
     task.estimateMin !== null ||
     Boolean(task.description?.trim()) ||
     task.checklist.length > 0 ||
-    Boolean(task.fromPreviousWeek) ||
     Boolean(task.urgent);
 
   const showFooter = hasMeta || resolvedLabels.length > 0;
@@ -71,6 +70,8 @@ export function TaskCard({ task, sortable = true }: { task: Task; sortable?: boo
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          // Long-press op mobiel opent anders per ongeluk het rechtermuisklik-menu.
+          if (isMobileViewport()) return;
           setMenu({ x: e.clientX, y: e.clientY });
         }}
         className={cn(
@@ -166,11 +167,6 @@ export function TaskCard({ task, sortable = true }: { task: Task; sortable?: boo
               >
                 <CheckSquare size={11} strokeWidth={1.75} />
                 {checklistDone}/{task.checklist.length}
-              </span>
-            )}
-            {task.fromPreviousWeek && (
-              <span className="rounded-pill bg-surface-3 px-1.5 py-0.5 text-[10px] font-medium text-muted">
-                van vorige week
               </span>
             )}
             <LabelDots labels={resolvedLabels} />

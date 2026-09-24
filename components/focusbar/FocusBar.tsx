@@ -2,7 +2,7 @@
 
 import { Columns3, Crosshair, Focus as FocusIcon } from 'lucide-react';
 import Link from 'next/link';
-import { WeekFocusPanel } from './WeekFocusPanel';
+import { QuotePanel } from './QuotePanel';
 import { DayFocusPanel } from './DayFocusPanel';
 import { ActiveTimerStrip } from './ActiveTimerStrip';
 import { useGoalsStore, mainMonthTarget } from '@/stores/useGoalsStore';
@@ -15,7 +15,7 @@ const btnClass = cn(
   'text-[11px] font-medium transition-colors cursor-pointer',
 );
 
-/** Compacte maandtarget-chip links van weekfocus. */
+/** Compacte maandtarget-chip links van de quote. */
 function MonthTargetChip() {
   const goals = useGoalsStore((s) => s.goals);
   const goal = mainMonthTarget(goals);
@@ -43,7 +43,7 @@ function MonthTargetChip() {
 
 /**
  * Sticky focusbalk.
- * Weekoverzicht: maandtarget + weekfocus + knop Focusmodus.
+ * Weekoverzicht: maandtarget + quote + knop Focusmodus.
  * Focusmodus: dagfocus + knop Weekbord.
  */
 export function FocusBar() {
@@ -94,9 +94,9 @@ export function FocusBar() {
       <div className="flex h-[52px] w-full min-w-0 items-center gap-2 px-3 sm:gap-3 sm:px-4 md:px-6">
         <MonthTargetChip />
         <span className="h-2.5 w-2.5 shrink-0 rounded-pill bg-green" />
-        <span className="panel-label hidden shrink-0 sm:block">Weekfocus</span>
-        <WeekFocusPanel
-          className="min-w-0 w-0 flex-1 border-0 bg-transparent px-0 text-[13.5px] font-semibold text-txt outline-none placeholder:font-normal placeholder:text-muted-2/70 focus:border-0"
+        <span className="panel-label hidden shrink-0 sm:block">Quote</span>
+        <QuotePanel
+          className="min-w-0 w-0 flex-1 border-0 bg-transparent px-0 text-[13.5px] font-normal text-txt outline-none placeholder:text-muted-2/70 focus:border-0"
         />
         <button
           type="button"

@@ -147,15 +147,23 @@ export function DumpPage() {
           )}
         </div>
 
-        <input
-          ref={inputRef}
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
-          placeholder="Inspiratie… Enter = aanmaken en openen"
-          className="mb-5 h-11 w-full rounded-card border border-line bg-surface px-3.5 text-[14px] text-txt shadow-soft-sm outline-none placeholder:text-muted-2 focus:border-green"
-        />
+        <form
+          className="mb-5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
+          <input
+            ref={inputRef}
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            enterKeyHint="done"
+            placeholder="Inspiratie… Enter = aanmaken en openen"
+            className="h-11 w-full rounded-card border border-line bg-surface px-3.5 text-[14px] text-txt shadow-soft-sm outline-none placeholder:text-muted-2 focus:border-green"
+          />
+        </form>
 
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           <div className="grid gap-6 md:grid-cols-2">
