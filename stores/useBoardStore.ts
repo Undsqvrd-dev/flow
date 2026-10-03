@@ -491,16 +491,21 @@ export const useBoardStore = create<BoardState>()(
 
       clearColumn: (dayKey, columnWeekOf) => {
         const prev = get().tasks;
-        const removed = prev.filter((t) => {
-          if (t.done || t.dayKey !== dayKey) return false;
-          if (isBoardDayKey(dayKey) && columnWeekOf) return t.weekOf === columnWeekOf;
-          return true;
+        const removed = tasksClearedByColumn(prev, dayKey, columnWeekOf);
+        if (!removed.length) return;
+
+        const removedIds = new Set(removed.map((t) => t.id));
+        const week = columnWeekOf ?? weekOf();
+        const prevSnapshots = get().sortSnapshots;
+        const nextSnapshots = { ...prevSnapshots };
+        delete nextSnapshots[quickWinBundleKey(dayKey, week)];
+
+        set({
+          tasks: prev.filter((t) => !removedIds.has(t.id)),
+          sortSnapshots: nextSnapshots,
         });
-        const next = prev.filter((t) => !removed.includes(t));
-        set({ tasks: next });
-        syncRemoveTasks(
-          removed.map((t) => t.id),
-          () => set({ tasks: prev }),
+        syncRemoveTasks([...removedIds], () =>
+          set({ tasks: prev, sortSnapshots: prevSnapshots }),
         );
       },
 
@@ -646,6 +651,19 @@ export function openTasksForDate(
       return true;
     })
     .sort((a, b) => a.rank - b.rank);
+}
+
+/**
+ * Taken die "Kolom leegmaken" verwijdert: dezelfde set als de kolom toont.
+ * Gedaan is afgeleid (`done` + afrondingsweek), niet `dayKey === 'gedaan'`.
+ */
+export function tasksClearedByColumn(
+  tasks: Task[],
+  dayKey: DayKey,
+  columnWeekOf?: string,
+): Task[] {
+  if (dayKey === 'gedaan') return doneTasksThisWeek(tasks, columnWeekOf ?? weekOf());
+  return openTasksForDay(tasks, dayKey, columnWeekOf);
 }
 
 /** De kolom 'Gedaan': deze week afgeronde taken (op `completedAt`), nieuwste eerst. */
