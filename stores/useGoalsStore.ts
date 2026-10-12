@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Goal, GoalHorizon, GoalScope, Value } from '@/lib/types';
 import { nextRank, uid } from '@/lib/utils';
+import { UNKNOWN_UPDATED_AT } from '@/lib/db/conflict';
 import {
   syncGoals,
   syncRemoveGoal,
@@ -59,7 +60,7 @@ export const useGoalsStore = create<GoalsState>()(
         };
         const prev = get().goals;
         set((s) => ({ goals: [...s.goals, goal] }));
-        syncGoals([goal], () => set({ goals: prev }));
+        syncGoals([goal], prev, () => set({ goals: prev }));
         return goal;
       },
       updateGoal: (id, patch) => {
@@ -70,7 +71,7 @@ export const useGoalsStore = create<GoalsState>()(
         );
         set({ goals: next });
         const updated = next.find((g) => g.id === id);
-        if (updated) syncGoals([updated], () => set({ goals: prev }));
+        if (updated) syncGoals([updated], prev, () => set({ goals: prev }));
       },
       removeGoal: (id) => {
         const prev = get().goals;
@@ -87,7 +88,7 @@ export const useGoalsStore = create<GoalsState>()(
         );
         set({ goals: next });
         const updated = next.find((g) => g.id === id);
-        if (updated) syncGoals([updated], () => set({ goals: prev }));
+        if (updated) syncGoals([updated], prev, () => set({ goals: prev }));
       },
 
       addValue: (text) => {
@@ -100,7 +101,7 @@ export const useGoalsStore = create<GoalsState>()(
           updatedAt: now,
         };
         set({ values: [...prev, value] });
-        syncValues([value], () => set({ values: prev }));
+        syncValues([value], prev, () => set({ values: prev }));
       },
       updateValue: (id, text) => {
         const prev = get().values;
@@ -110,7 +111,7 @@ export const useGoalsStore = create<GoalsState>()(
         );
         set({ values: next });
         const updated = next.find((v) => v.id === id);
-        if (updated) syncValues([updated], () => set({ values: prev }));
+        if (updated) syncValues([updated], prev, () => set({ values: prev }));
       },
       removeValue: (id) => {
         const prev = get().values;
@@ -120,20 +121,19 @@ export const useGoalsStore = create<GoalsState>()(
     }),
     {
       name: 'flow-goals',
-      migrate: (persisted, version) => {
+      migrate: (persisted) => {
         const state = persisted as GoalsState;
-        const now = new Date().toISOString();
         return {
           ...state,
           quotes: undefined,
           goals: (state.goals ?? []).map((g) => ({
             ...g,
             horizon: g.horizon ?? 'jaar',
-            updatedAt: g.updatedAt ?? now,
+            updatedAt: g.updatedAt ?? UNKNOWN_UPDATED_AT,
           })),
           values: (state.values ?? []).map((v) => ({
             ...v,
-            updatedAt: v.updatedAt ?? now,
+            updatedAt: v.updatedAt ?? UNKNOWN_UPDATED_AT,
           })),
         };
       },

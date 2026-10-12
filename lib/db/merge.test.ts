@@ -69,17 +69,28 @@ describe('mergeRemoteData', () => {
     expect(merged.tasks[0].title).toBe('Remote taak');
   });
 
-  it('behoudt lokale items die remote ontbreken (lokale nieuw)', () => {
+  it('laat een lokale rij die de server niet heeft weg, zodat een delete blijft', () => {
     const local: MergeableStore = {
       ...emptyStore(),
-      tasks: [makeTask('task-1', 'Lokale taak', '2026-10-12T12:00:00Z')],
+      tasks: [makeTask('task-1', 'Lokaal spook', '2026-10-12T12:00:00Z')],
     };
     const remote = emptyStore();
 
     const merged = mergeRemoteData(local, remote);
 
+    expect(merged.tasks).toHaveLength(0);
+  });
+
+  it('houdt een net aangemaakte lokale rij vast zolang die nog weggeschreven wordt', () => {
+    const local: MergeableStore = {
+      ...emptyStore(),
+      tasks: [makeTask('task-new', 'Nog onderweg', '2026-10-12T12:00:00Z')],
+    };
+
+    const merged = mergeRemoteData(local, emptyStore(), { tasks: new Set(['task-new']) });
+
     expect(merged.tasks).toHaveLength(1);
-    expect(merged.tasks[0].title).toBe('Lokale taak');
+    expect(merged.tasks[0].title).toBe('Nog onderweg');
   });
 
   it('gebruikt nieuwste versie bij conflict (remote nieuwer)', () => {
@@ -134,9 +145,9 @@ describe('mergeRemoteData', () => {
 
     const merged = mergeRemoteData(local, remote);
 
-    expect(merged.tasks).toHaveLength(3);
+    expect(merged.tasks).toHaveLength(2);
     expect(merged.tasks.find((t) => t.id === 'task-1')?.title).toBe('Remote nieuw');
-    expect(merged.tasks.find((t) => t.id === 'task-2')?.title).toBe('Alleen lokaal');
+    expect(merged.tasks.find((t) => t.id === 'task-2')).toBeUndefined();
     expect(merged.tasks.find((t) => t.id === 'task-3')?.title).toBe('Alleen remote');
 
     expect(merged.goals).toHaveLength(1);
@@ -161,14 +172,13 @@ describe('itemsToPush', () => {
     expect(toPush[0].id).toBe('task-1');
   });
 
-  it('retourneert nieuwe lokale items die niet in remote zitten', () => {
-    const merged = [makeTask('task-new', 'Nieuwe lokale taak', '2026-10-12T14:00:00Z')];
+  it('pusht geen lokale rij die de server niet heeft, anders herleeft een delete', () => {
+    const merged = [makeTask('task-new', 'Verwijderd op de server', '2026-10-12T14:00:00Z')];
     const remote: Task[] = [];
 
     const toPush = itemsToPush(merged, remote);
 
-    expect(toPush).toHaveLength(1);
-    expect(toPush[0].id).toBe('task-new');
+    expect(toPush).toHaveLength(0);
   });
 
   it('retourneert lege array als alles al gesync is', () => {

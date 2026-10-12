@@ -18,6 +18,23 @@ import {
   type DayStateRow,
   type PomodoroRow,
 } from '@/lib/supabase/mappers';
+import { applyDelete, applyUpsert } from '@/lib/db/applyRemote';
+import {
+  dayDirtyIds,
+  focusDirtyIds,
+  goalDirtyIds,
+  pomodoroDirtyIds,
+  rememberDay,
+  rememberFocus,
+  rememberGoal,
+  rememberPomodoro,
+  rememberSport,
+  rememberTask,
+  rememberValue,
+  sportDirtyIds,
+  taskDirtyIds,
+  valueDirtyIds,
+} from '@/lib/db/liveSync';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useGoalsStore } from '@/stores/useGoalsStore';
 import { useFocusStore } from '@/stores/useFocusStore';
@@ -33,163 +50,114 @@ interface RealtimePayload {
 let channel: RealtimeChannel | null = null;
 let isSubscribed = false;
 
-function mergeItem<T extends { id?: string; updatedAt: string }>(
-  items: T[],
-  incoming: T,
-  getId: (item: T) => string,
-): T[] {
-  const id = getId(incoming);
-  const existing = items.find((item) => getId(item) === id);
-
-  if (!existing) {
-    return [...items, incoming];
-  }
-
-  const existingTs = Date.parse(existing.updatedAt) || 0;
-  const incomingTs = Date.parse(incoming.updatedAt) || 0;
-
-  if (incomingTs > existingTs) {
-    return items.map((item) => (getId(item) === id ? incoming : item));
-  }
-
-  return items;
-}
-
-function removeItem<T>(items: T[], id: string, getId: (item: T) => string): T[] {
-  return items.filter((item) => getId(item) !== id);
+function textField(row: Record<string, unknown>, key: string): string {
+  const value = row[key];
+  return typeof value === 'string' ? value : '';
 }
 
 function handleTaskChange(payload: RealtimePayload): void {
   const state = useBoardStore.getState();
-
-  if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-    const task = taskFromRow(payload.new as TaskRow);
-    const merged = mergeItem(state.tasks, task, (t) => t.id);
-    if (merged !== state.tasks) {
-      useBoardStore.setState({ tasks: merged });
-    }
-  } else if (payload.eventType === 'DELETE') {
-    const oldRow = payload.old as { id?: string };
-    if (oldRow.id) {
-      useBoardStore.setState({
-        tasks: removeItem(state.tasks, oldRow.id, (t) => t.id),
-      });
-    }
+  if (payload.eventType === 'DELETE') {
+    useBoardStore.setState({
+      tasks: applyDelete(state.tasks, textField(payload.old, 'id'), (task) => task.id),
+    });
+    return;
   }
+  const task = taskFromRow(payload.new as unknown as TaskRow);
+  const next = applyUpsert(state.tasks, task, (item) => item.id, taskDirtyIds());
+  if (next === state.tasks) return;
+  useBoardStore.setState({ tasks: next });
+  rememberTask(task.id, task.updatedAt);
 }
 
 function handleGoalChange(payload: RealtimePayload): void {
   const state = useGoalsStore.getState();
-
-  if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-    const goal = goalFromRow(payload.new as GoalRow);
-    const merged = mergeItem(state.goals, goal, (g) => g.id);
-    if (merged !== state.goals) {
-      useGoalsStore.setState({ goals: merged });
-    }
-  } else if (payload.eventType === 'DELETE') {
-    const oldRow = payload.old as { id?: string };
-    if (oldRow.id) {
-      useGoalsStore.setState({
-        goals: removeItem(state.goals, oldRow.id, (g) => g.id),
-      });
-    }
+  if (payload.eventType === 'DELETE') {
+    useGoalsStore.setState({
+      goals: applyDelete(state.goals, textField(payload.old, 'id'), (goal) => goal.id),
+    });
+    return;
   }
+  const goal = goalFromRow(payload.new as unknown as GoalRow);
+  const next = applyUpsert(state.goals, goal, (item) => item.id, goalDirtyIds());
+  if (next === state.goals) return;
+  useGoalsStore.setState({ goals: next });
+  rememberGoal(goal.id, goal.updatedAt);
 }
 
 function handleValueChange(payload: RealtimePayload): void {
   const state = useGoalsStore.getState();
-
-  if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-    const value = valueFromRow(payload.new as ValueRow);
-    const merged = mergeItem(state.values, value, (v) => v.id);
-    if (merged !== state.values) {
-      useGoalsStore.setState({ values: merged });
-    }
-  } else if (payload.eventType === 'DELETE') {
-    const oldRow = payload.old as { id?: string };
-    if (oldRow.id) {
-      useGoalsStore.setState({
-        values: removeItem(state.values, oldRow.id, (v) => v.id),
-      });
-    }
+  if (payload.eventType === 'DELETE') {
+    useGoalsStore.setState({
+      values: applyDelete(state.values, textField(payload.old, 'id'), (value) => value.id),
+    });
+    return;
   }
+  const value = valueFromRow(payload.new as unknown as ValueRow);
+  const next = applyUpsert(state.values, value, (item) => item.id, valueDirtyIds());
+  if (next === state.values) return;
+  useGoalsStore.setState({ values: next });
+  rememberValue(value.id, value.updatedAt);
 }
 
 function handleFocusChange(payload: RealtimePayload): void {
   const state = useFocusStore.getState();
-
-  if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-    const focus = focusFromRow(payload.new as FocusRow);
-    const merged = mergeItem(state.focuses, focus, (f) => f.id);
-    if (merged !== state.focuses) {
-      useFocusStore.setState({ focuses: merged });
-    }
-  } else if (payload.eventType === 'DELETE') {
-    const oldRow = payload.old as { id?: string };
-    if (oldRow.id) {
-      useFocusStore.setState({
-        focuses: removeItem(state.focuses, oldRow.id, (f) => f.id),
-      });
-    }
+  if (payload.eventType === 'DELETE') {
+    useFocusStore.setState({
+      focuses: applyDelete(state.focuses, textField(payload.old, 'id'), (focus) => focus.id),
+    });
+    return;
   }
+  const focus = focusFromRow(payload.new as unknown as FocusRow);
+  const next = applyUpsert(state.focuses, focus, (item) => item.id, focusDirtyIds());
+  if (next === state.focuses) return;
+  useFocusStore.setState({ focuses: next });
+  rememberFocus(focus.id, focus.updatedAt);
 }
 
 function handleSportChange(payload: RealtimePayload): void {
   const state = useSportStore.getState();
-
-  if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-    const session = sportFromRow(payload.new as SportRow);
-    const merged = mergeItem(state.sessions, session, (s) => s.id);
-    if (merged !== state.sessions) {
-      useSportStore.setState({ sessions: merged });
-    }
-  } else if (payload.eventType === 'DELETE') {
-    const oldRow = payload.old as { id?: string };
-    if (oldRow.id) {
-      useSportStore.setState({
-        sessions: removeItem(state.sessions, oldRow.id, (s) => s.id),
-      });
-    }
+  if (payload.eventType === 'DELETE') {
+    useSportStore.setState({
+      sessions: applyDelete(state.sessions, textField(payload.old, 'id'), (session) => session.id),
+    });
+    return;
   }
+  const session = sportFromRow(payload.new as unknown as SportRow);
+  const next = applyUpsert(state.sessions, session, (item) => item.id, sportDirtyIds());
+  if (next === state.sessions) return;
+  useSportStore.setState({ sessions: next });
+  rememberSport(session.id, session.updatedAt);
 }
 
 function handleDayStateChange(payload: RealtimePayload): void {
   const state = useBoardStore.getState();
-
-  if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-    const dayState = dayStateFromRow(payload.new as DayStateRow);
-    const merged = mergeItem(state.dayStates, dayState, (d) => d.date);
-    if (merged !== state.dayStates) {
-      useBoardStore.setState({ dayStates: merged });
-    }
-  } else if (payload.eventType === 'DELETE') {
-    const oldRow = payload.old as { date?: string };
-    if (oldRow.date) {
-      useBoardStore.setState({
-        dayStates: removeItem(state.dayStates, oldRow.date, (d) => d.date),
-      });
-    }
+  if (payload.eventType === 'DELETE') {
+    useBoardStore.setState({
+      dayStates: applyDelete(state.dayStates, textField(payload.old, 'date'), (day) => day.date),
+    });
+    return;
   }
+  const dayState = dayStateFromRow(payload.new as unknown as DayStateRow);
+  const next = applyUpsert(state.dayStates, dayState, (item) => item.date, dayDirtyIds());
+  if (next === state.dayStates) return;
+  useBoardStore.setState({ dayStates: next });
+  rememberDay(dayState.date, dayState.updatedAt);
 }
 
 function handlePomodoroChange(payload: RealtimePayload): void {
   const state = usePomodoroStore.getState();
-
-  if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-    const session = pomodoroFromRow(payload.new as PomodoroRow);
-    const merged = mergeItem(state.sessions, session, (s) => s.id);
-    if (merged !== state.sessions) {
-      usePomodoroStore.setState({ sessions: merged });
-    }
-  } else if (payload.eventType === 'DELETE') {
-    const oldRow = payload.old as { id?: string };
-    if (oldRow.id) {
-      usePomodoroStore.setState({
-        sessions: removeItem(state.sessions, oldRow.id, (s) => s.id),
-      });
-    }
+  if (payload.eventType === 'DELETE') {
+    usePomodoroStore.setState({
+      sessions: applyDelete(state.sessions, textField(payload.old, 'id'), (session) => session.id),
+    });
+    return;
   }
+  const session = pomodoroFromRow(payload.new as unknown as PomodoroRow);
+  const next = applyUpsert(state.sessions, session, (item) => item.id, pomodoroDirtyIds());
+  if (next === state.sessions) return;
+  usePomodoroStore.setState({ sessions: next });
+  rememberPomodoro(session.id, session.updatedAt);
 }
 
 export function subscribeToRealtime(): void {

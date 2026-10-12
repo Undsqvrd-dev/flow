@@ -1,3 +1,4 @@
+import { timestampMs } from '@/lib/db/conflict';
 import type {
   Task,
   Goal,
@@ -21,9 +22,29 @@ export interface MergeableStore {
 type WithUpdatedAt = { updatedAt: string };
 type WithId = { id: string };
 
+export interface RetainLocalIds {
+  tasks?: ReadonlySet<string>;
+  goals?: ReadonlySet<string>;
+  values?: ReadonlySet<string>;
+  focuses?: ReadonlySet<string>;
+  sportSessions?: ReadonlySet<string>;
+  dayStates?: ReadonlySet<string>;
+  pomodoroSessions?: ReadonlySet<string>;
+}
+
+const EMPTY: ReadonlySet<string> = new Set();
+
+/**
+ * Serverlidmaatschap wint: een rij die alleen lokaal bestaat is geen serverrij
+ * en wordt niet teruggezet (anders herleeft een delete). `retain` houdt rijen
+ * vast die deze client net heeft aangemaakt en nog wegschrijft.
+ * Bij een gedeelde id wint de nieuwste `updatedAt`. Serverrijen die lokaal
+ * ontbreken blijven staan.
+ */
 function mergeById<T extends WithId & WithUpdatedAt>(
   local: T[],
   remote: T[],
+  retain: ReadonlySet<string>,
 ): T[] {
   const result = new Map<string, T>();
 
@@ -34,14 +55,11 @@ function mergeById<T extends WithId & WithUpdatedAt>(
   for (const item of local) {
     const existing = result.get(item.id);
     if (!existing) {
-      result.set(item.id, item);
+      if (retain.has(item.id)) result.set(item.id, item);
       continue;
     }
 
-    const localTs = Date.parse(item.updatedAt) || 0;
-    const remoteTs = Date.parse(existing.updatedAt) || 0;
-
-    if (localTs > remoteTs) {
+    if (timestampMs(item.updatedAt) > timestampMs(existing.updatedAt)) {
       result.set(item.id, item);
     }
   }
@@ -53,6 +71,7 @@ function mergeByKey<T extends WithUpdatedAt>(
   local: T[],
   remote: T[],
   getKey: (item: T) => string,
+  retain: ReadonlySet<string>,
 ): T[] {
   const result = new Map<string, T>();
 
@@ -64,14 +83,11 @@ function mergeByKey<T extends WithUpdatedAt>(
     const key = getKey(item);
     const existing = result.get(key);
     if (!existing) {
-      result.set(key, item);
+      if (retain.has(key)) result.set(key, item);
       continue;
     }
 
-    const localTs = Date.parse(item.updatedAt) || 0;
-    const remoteTs = Date.parse(existing.updatedAt) || 0;
-
-    if (localTs > remoteTs) {
+    if (timestampMs(item.updatedAt) > timestampMs(existing.updatedAt)) {
       result.set(key, item);
     }
   }
@@ -82,15 +98,20 @@ function mergeByKey<T extends WithUpdatedAt>(
 export function mergeRemoteData(
   local: MergeableStore,
   remote: MergeableStore,
+  retain: RetainLocalIds = {},
 ): MergeableStore {
   return {
-    tasks: mergeById(local.tasks, remote.tasks),
-    goals: mergeById(local.goals, remote.goals),
-    values: mergeById(local.values, remote.values),
-    focuses: mergeById(local.focuses, remote.focuses),
-    sportSessions: mergeById(local.sportSessions, remote.sportSessions),
-    dayStates: mergeByKey(local.dayStates, remote.dayStates, (d) => d.date),
-    pomodoroSessions: mergeById(local.pomodoroSessions, remote.pomodoroSessions),
+    tasks: mergeById(local.tasks, remote.tasks, retain.tasks ?? EMPTY),
+    goals: mergeById(local.goals, remote.goals, retain.goals ?? EMPTY),
+    values: mergeById(local.values, remote.values, retain.values ?? EMPTY),
+    focuses: mergeById(local.focuses, remote.focuses, retain.focuses ?? EMPTY),
+    sportSessions: mergeById(local.sportSessions, remote.sportSessions, retain.sportSessions ?? EMPTY),
+    dayStates: mergeByKey(local.dayStates, remote.dayStates, (d) => d.date, retain.dayStates ?? EMPTY),
+    pomodoroSessions: mergeById(
+      local.pomodoroSessions,
+      remote.pomodoroSessions,
+      retain.pomodoroSessions ?? EMPTY,
+    ),
   };
 }
 
@@ -102,9 +123,8 @@ export function itemsToPush<T extends WithId & WithUpdatedAt>(
 
   return merged.filter((item) => {
     const remoteItem = remoteById.get(item.id);
-    if (!remoteItem) return true;
-    const localTs = Date.parse(item.updatedAt) || 0;
-    const remoteTs = Date.parse(remoteItem.updatedAt) || 0;
-    return localTs > remoteTs;
+    // Alleen-lokale rijen niet opnieuw inserten: een server-delete moet blijven.
+    if (!remoteItem) return false;
+    return timestampMs(item.updatedAt) > timestampMs(remoteItem.updatedAt);
   });
 }

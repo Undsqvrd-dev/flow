@@ -51,7 +51,7 @@ function upsert(focuses: Focus[], week: string, patch: Partial<Focus>): Focus[] 
 function syncWeek(prev: Focus[], next: Focus[]): void {
   const week = weekOf();
   const updated = next.find((f) => f.weekOf === week);
-  if (updated) syncFocuses([updated], () => useFocusStore.setState({ focuses: prev }));
+  if (updated) syncFocuses([updated], prev, () => useFocusStore.setState({ focuses: prev }));
 }
 
 export const useFocusStore = create<FocusState>()(

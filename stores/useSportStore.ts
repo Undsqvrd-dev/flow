@@ -6,6 +6,7 @@ import type { SportSession } from '@/lib/types';
 import { uid } from '@/lib/utils';
 import { weekOf } from '@/lib/dates';
 import { useGoalsStore } from './useGoalsStore';
+import { UNKNOWN_UPDATED_AT } from '@/lib/db/conflict';
 import { syncRemoveSport, syncSport } from '@/lib/db/storeSync';
 
 export interface NewSportSession {
@@ -47,7 +48,7 @@ export const useSportStore = create<SportState>()(
           updatedAt: now,
         };
         set({ sessions: [...prev, session] });
-        syncSport([session], () => set({ sessions: prev }));
+        syncSport([session], prev, () => set({ sessions: prev }));
         bumpLinkedGoal(1);
       },
 
@@ -63,12 +64,11 @@ export const useSportStore = create<SportState>()(
       name: 'flow-sport',
       migrate: (persisted) => {
         const state = persisted as SportState;
-        const now = new Date().toISOString();
         return {
           ...state,
           sessions: (state.sessions ?? []).map((s) => ({
             ...s,
-            updatedAt: s.updatedAt ?? now,
+            updatedAt: s.updatedAt ?? UNKNOWN_UPDATED_AT,
           })),
         };
       },

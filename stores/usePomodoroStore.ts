@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { PomodoroSession } from '@/lib/types';
 import { uid } from '@/lib/utils';
+import { UNKNOWN_UPDATED_AT } from '@/lib/db/conflict';
 import { syncPomodoro } from '@/lib/db/storeSync';
 
 export type TimerPhase = 'idle' | 'running' | 'paused';
@@ -97,7 +98,7 @@ export const usePomodoroStore = create<PomodoroState>()(
           roundsCompleted: rounds,
           sessions: [...prevSessions, session],
         });
-        syncPomodoro([session], () => set({ sessions: prevSessions }));
+        syncPomodoro([session], prevSessions, () => set({ sessions: prevSessions }));
       },
 
       setTask: (taskId) => set({ taskId }),
@@ -106,12 +107,11 @@ export const usePomodoroStore = create<PomodoroState>()(
       name: 'flow-pomodoro',
       migrate: (persisted) => {
         const state = persisted as PomodoroState;
-        const now = new Date().toISOString();
         return {
           ...state,
           sessions: (state.sessions ?? []).map((s) => ({
             ...s,
-            updatedAt: s.updatedAt ?? now,
+            updatedAt: s.updatedAt ?? UNKNOWN_UPDATED_AT,
           })),
         };
       },

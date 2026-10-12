@@ -4,8 +4,31 @@ import { getSupabaseEnv } from '@/lib/supabase/env';
 import { createClient } from '@/lib/supabase/client';
 import { setQuickWinBundleCache } from '@/lib/db/bundleCache';
 import { markSyncReady } from '@/lib/db/enabled';
-import { isRemoteEmpty, loadAll, pushAll, upsertTasks, type RemoteBundle } from '@/lib/db/sync';
+import {
+  isRemoteEmpty,
+  loadAll,
+  pushAll,
+  upsertDayStates,
+  upsertFocuses,
+  upsertGoals,
+  upsertPomodoroSessions,
+  upsertSportSessions,
+  upsertTasks,
+  upsertValues,
+  type ReconcileResult,
+  type RemoteBundle,
+} from '@/lib/db/sync';
+import { timestampMs } from '@/lib/db/conflict';
 import { mergeRemoteData, itemsToPush, type MergeableStore } from '@/lib/db/merge';
+import {
+  rememberDay,
+  rememberFocus,
+  rememberGoal,
+  rememberPomodoro,
+  rememberSport,
+  rememberTask,
+  rememberValue,
+} from '@/lib/db/liveSync';
 import { subscribeToRealtime } from '@/lib/db/realtime';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useFocusStore } from '@/stores/useFocusStore';
@@ -128,6 +151,7 @@ async function bootstrapOnce(): Promise<void> {
     await pushAll(local);
     localStorage.setItem(MIGRATED_KEY, '1');
     markSyncReady(true);
+    subscribeToRealtime();
     return;
   }
 
@@ -162,16 +186,99 @@ async function bootstrapOnce(): Promise<void> {
   };
 
   hydrate(merged);
+  rememberHydrated(merged);
 
-  const pendingTasks = itemsToPush(mergedStore.tasks, remote.tasks);
-  if (pendingTasks.length) {
-    await upsertTasks(pendingTasks);
-  }
+  await pushNewerThanServer(mergedStore, remoteStore);
 
   localStorage.setItem(MIGRATED_KEY, '1');
   markSyncReady(true);
 
   subscribeToRealtime();
+}
+
+function rememberHydrated(data: MergeableStore): void {
+  for (const task of data.tasks) rememberTask(task.id, task.updatedAt);
+  for (const goal of data.goals) rememberGoal(goal.id, goal.updatedAt);
+  for (const value of data.values) rememberValue(value.id, value.updatedAt);
+  for (const focus of data.focuses) rememberFocus(focus.id, focus.updatedAt);
+  for (const session of data.sportSessions) rememberSport(session.id, session.updatedAt);
+  for (const day of data.dayStates) rememberDay(day.date, day.updatedAt);
+  for (const session of data.pomodoroSessions) rememberPomodoro(session.id, session.updatedAt);
+}
+
+function applyWins<T>(
+  current: T[],
+  result: ReconcileResult<T>,
+  getKey: (item: T) => string,
+): T[] {
+  if (!result.serverWins.length && !result.removedKeys.length && !result.written.length) return current;
+  const preferred = new Map<string, T>();
+  for (const item of result.written) preferred.set(getKey(item), item);
+  for (const item of result.serverWins) preferred.set(getKey(item), item);
+  const removed = new Set(result.removedKeys);
+  return current
+    .filter((item) => !removed.has(getKey(item)))
+    .map((item) => preferred.get(getKey(item)) ?? item);
+}
+
+/** Alleen rijen die lokaal nieuwer zijn dan de server. Ontbrekende serverrijen blijven. */
+async function pushNewerThanServer(local: MergeableStore, remote: MergeableStore): Promise<void> {
+  const tasks = applyWins(
+    useBoardStore.getState().tasks,
+    await upsertTasks(itemsToPush(local.tasks, remote.tasks)),
+    (task) => task.id,
+  );
+  const goals = applyWins(
+    useGoalsStore.getState().goals,
+    await upsertGoals(itemsToPush(local.goals, remote.goals)),
+    (goal) => goal.id,
+  );
+  const values = applyWins(
+    useGoalsStore.getState().values,
+    await upsertValues(itemsToPush(local.values, remote.values)),
+    (value) => value.id,
+  );
+  const focuses = applyWins(
+    useFocusStore.getState().focuses,
+    await upsertFocuses(itemsToPush(local.focuses, remote.focuses)),
+    (focus) => focus.id,
+  );
+  const sessions = applyWins(
+    useSportStore.getState().sessions,
+    await upsertSportSessions(itemsToPush(local.sportSessions, remote.sportSessions)),
+    (session) => session.id,
+  );
+  const dayStates = applyWins(
+    useBoardStore.getState().dayStates,
+    await upsertDayStates(
+      local.dayStates.filter((day) => {
+        const server = remote.dayStates.find((item) => item.date === day.date);
+        if (!server) return false;
+        return timestampMs(day.updatedAt) > timestampMs(server.updatedAt);
+      }),
+    ),
+    (day) => day.date,
+  );
+  const pomodoro = applyWins(
+    usePomodoroStore.getState().sessions,
+    await upsertPomodoroSessions(itemsToPush(local.pomodoroSessions, remote.pomodoroSessions)),
+    (session) => session.id,
+  );
+
+  useBoardStore.setState({ tasks, dayStates });
+  useGoalsStore.setState({ goals, values });
+  useFocusStore.setState({ focuses });
+  useSportStore.setState({ sessions });
+  usePomodoroStore.setState({ sessions: pomodoro });
+  rememberHydrated({
+    tasks,
+    goals,
+    values,
+    focuses,
+    sportSessions: sessions,
+    dayStates,
+    pomodoroSessions: pomodoro,
+  });
 }
 
 /** Eenmalig na login: remote laden, mergen met localStorage, ontbrekende taken terugzetten. */
@@ -197,11 +304,28 @@ export function resetBootstrapFlag(): void {
   markSyncReady(false);
 }
 
-/** Nood-sync: huidige lokale state volledig naar Supabase (bijv. na herstel). */
+/** Nood-sync: lokale rijen schrijven, maar een nieuwere serverrij niet overschrijven. */
 export async function forcePushLocalToRemote(): Promise<{ taskCount: number }> {
   await waitForPersistHydration();
   const local = snapshotLocal();
   await pushAll(local);
+  const remote = await loadAll();
+  const merged = mergeRemoteData(local, {
+    tasks: remote.tasks,
+    goals: remote.goals,
+    values: remote.values,
+    focuses: remote.focuses,
+    sportSessions: remote.sportSessions,
+    dayStates: remote.dayStates,
+    pomodoroSessions: remote.pomodoroSessions,
+  });
+  hydrate({
+    ...merged,
+    settings: remote.settings,
+    quickWinBundles: remote.quickWinBundles,
+  });
+  rememberHydrated(merged);
   markSyncReady(true);
-  return { taskCount: local.tasks.length };
+  subscribeToRealtime();
+  return { taskCount: merged.tasks.length };
 }
