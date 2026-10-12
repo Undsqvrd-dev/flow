@@ -14,6 +14,7 @@ import {
 import { nextRank, prevRank, rankBetween, RANK_STEP, uid } from '@/lib/utils';
 import { QUADRANT_ORDER, quadrant } from '@/lib/priority';
 import { setQuickWinBundleCache } from '@/lib/db/bundleCache';
+import { UNKNOWN_UPDATED_AT } from '@/lib/db/conflict';
 import {
   syncDayStates,
   syncRemoveTask,
@@ -187,7 +188,7 @@ export const useBoardStore = create<BoardState>()(
         );
         const task = makeTask(input, siblings);
         set({ tasks: [...prev, task] });
-        syncTasks([task], () => set({ tasks: prev }));
+        syncTasks([task], prev, () => set({ tasks: prev }));
         return task;
       },
 
@@ -196,7 +197,7 @@ export const useBoardStore = create<BoardState>()(
         const next = prev.map((t) => (t.id === id ? touch({ ...t, ...patch }) : t));
         set({ tasks: next });
         const updated = next.find((t) => t.id === id);
-        if (updated) syncTasks([updated], () => set({ tasks: prev }));
+        if (updated) syncTasks([updated], prev, () => set({ tasks: prev }));
       },
 
       removeTask: (id) => {
@@ -223,7 +224,7 @@ export const useBoardStore = create<BoardState>()(
           updatedAt: now,
         };
         set({ tasks: [...prev, copy] });
-        syncTasks([copy], () => set({ tasks: prev }));
+        syncTasks([copy], prev, () => set({ tasks: prev }));
       },
 
       toggleDone: (id) => {
@@ -239,7 +240,7 @@ export const useBoardStore = create<BoardState>()(
         );
         set({ tasks: next });
         const updated = next.find((t) => t.id === id);
-        if (updated) syncTasks([updated], () => set({ tasks: prev }));
+        if (updated) syncTasks([updated], prev, () => set({ tasks: prev }));
       },
 
       moveTask: (id, dayKey, daypart, index, targetWeekOf) => {
@@ -278,7 +279,7 @@ export const useBoardStore = create<BoardState>()(
         );
         set({ tasks: next });
         const changed = next.filter((t) => patches.has(t.id));
-        syncTasks(changed, () => set({ tasks: prev }));
+        syncTasks(changed, prev, () => set({ tasks: prev }));
       },
 
       moveQuickWinBundle: (fromDayKey, fromWeekOf, toDayKey, toWeekOf) => {
@@ -329,7 +330,7 @@ export const useBoardStore = create<BoardState>()(
         setQuickWinBundleCache(nextBundles);
 
         const changed = nextTasks.filter((t) => moveIds.has(t.id));
-        syncTasks(changed, () => {
+        syncTasks(changed, prevTasks, () => {
           set({ tasks: prevTasks, quickWinBundles: prevBundles });
           setQuickWinBundleCache(prevBundles);
         });
@@ -366,6 +367,7 @@ export const useBoardStore = create<BoardState>()(
         set({ tasks: next });
         syncTasks(
           next.filter((t) => t.id === task.id || t.id === other.id),
+          prev,
           () => set({ tasks: prev }),
         );
       },
@@ -440,6 +442,7 @@ export const useBoardStore = create<BoardState>()(
         set({ tasks: next, sortSnapshots });
         syncTasks(
           next.filter((t) => patches.has(t.id)),
+          prev,
           () => set({ tasks: prev, sortSnapshots: state.sortSnapshots }),
         );
       },
@@ -463,6 +466,7 @@ export const useBoardStore = create<BoardState>()(
         set({ tasks: next, sortSnapshots: nextSnapshots });
         syncTasks(
           next.filter((t, i) => t !== prev[i]),
+          prev,
           () => set({ tasks: prev, sortSnapshots: state.sortSnapshots }),
         );
       },
@@ -485,6 +489,7 @@ export const useBoardStore = create<BoardState>()(
         set({ tasks: next });
         syncTasks(
           next.filter((t, i) => t !== prev[i]),
+          prev,
           () => set({ tasks: prev }),
         );
       },
@@ -511,24 +516,27 @@ export const useBoardStore = create<BoardState>()(
 
       closeDay: (date, reflection = null) => {
         const prev = get().dayStates;
-        const state = {
+        const now = new Date().toISOString();
+        const state: DayState = {
           date,
           closed: true,
-          closedAt: new Date().toISOString(),
+          closedAt: now,
           reflection,
+          updatedAt: now,
         };
         set({ dayStates: [...prev.filter((d) => d.date !== date), state] });
-        syncDayStates([state], () => set({ dayStates: prev }));
+        syncDayStates([state], prev, () => set({ dayStates: prev }));
       },
 
       reopenDay: (date) => {
         const prev = get().dayStates;
+        const now = new Date().toISOString();
         const next = prev.map((d) =>
-          d.date === date ? { ...d, closed: false, closedAt: null } : d,
+          d.date === date ? { ...d, closed: false, closedAt: null, updatedAt: now } : d,
         );
         set({ dayStates: next });
         const updated = next.find((d) => d.date === date);
-        if (updated) syncDayStates([updated], () => set({ dayStates: prev }));
+        if (updated) syncDayStates([updated], prev, () => set({ dayStates: prev }));
       },
 
       enableQuickWinBundle: (dayKey, columnWeekOf) => {
@@ -578,18 +586,39 @@ export const useBoardStore = create<BoardState>()(
         });
         set({ tasks: next });
         const changed = next.filter((t, i) => t !== prev[i]);
-        if (changed.length) syncTasks(changed, () => set({ tasks: prev }));
+        if (changed.length) syncTasks(changed, prev, () => set({ tasks: prev }));
       },
     }),
     {
       name: 'flow-board',
+      migrate: (persisted) => {
+        const p = (persisted ?? {}) as {
+          tasks?: Task[];
+          dayStates?: DayState[];
+          quickWinBundles?: string[];
+          sortSnapshots?: Record<string, SortSnapshotEntry[]>;
+        };
+        return {
+          tasks: migrateTasks(p.tasks ?? []),
+          dayStates: (p.dayStates ?? []).map((d) => ({
+            ...d,
+            updatedAt: d.updatedAt ?? UNKNOWN_UPDATED_AT,
+          })),
+          quickWinBundles: migrateBundles(p.quickWinBundles ?? []),
+          sortSnapshots: p.sortSnapshots ?? {},
+        };
+      },
+      version: 1,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<BoardState>;
         return {
           ...current,
           ...p,
           tasks: migrateTasks(p.tasks ?? current.tasks),
-          dayStates: p.dayStates ?? current.dayStates,
+          dayStates: (p.dayStates ?? current.dayStates).map((d) => ({
+            ...d,
+            updatedAt: d.updatedAt ?? UNKNOWN_UPDATED_AT,
+          })),
           quickWinBundles: migrateBundles(p.quickWinBundles ?? []),
           sortSnapshots: p.sortSnapshots ?? {},
         };

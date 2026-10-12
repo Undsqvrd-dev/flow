@@ -47,12 +47,14 @@ export type GoalRow = {
   deadline: string | null;
   active: boolean;
   rank: number;
+  updated_at: string;
 };
 
 export type ValueRow = {
   id: string;
   text: string;
   rank: number;
+  updated_at: string;
 };
 
 export type FocusRow = {
@@ -73,6 +75,7 @@ export type SportRow = {
   duration_min: number;
   intensity: number;
   note: string | null;
+  updated_at: string;
 };
 
 export type DayStateRow = {
@@ -80,6 +83,7 @@ export type DayStateRow = {
   closed: boolean;
   closed_at: string | null;
   reflection: string | null;
+  updated_at: string;
 };
 
 export type PomodoroRow = {
@@ -90,6 +94,7 @@ export type PomodoroRow = {
   actual_min: number;
   started_at: string;
   completed: boolean;
+  updated_at: string;
 };
 
 export type SettingsRow = {
@@ -162,6 +167,7 @@ export function goalFromRow(row: GoalRow): Goal {
     deadline: row.deadline,
     active: row.active,
     rank: row.rank,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -178,15 +184,16 @@ export function goalToRow(goal: Goal) {
     deadline: goal.deadline,
     active: goal.active,
     rank: goal.rank,
+    updated_at: goal.updatedAt,
   };
 }
 
 export function valueFromRow(row: ValueRow): Value {
-  return { id: row.id, text: row.text, rank: row.rank };
+  return { id: row.id, text: row.text, rank: row.rank, updatedAt: row.updated_at };
 }
 
 export function valueToRow(value: Value) {
-  return { id: value.id, text: value.text, rank: value.rank };
+  return { id: value.id, text: value.text, rank: value.rank, updated_at: value.updatedAt };
 }
 
 export function focusFromRow(row: FocusRow): Focus {
@@ -223,6 +230,7 @@ export function sportFromRow(row: SportRow): SportSession {
     durationMin: row.duration_min,
     intensity: row.intensity as SportSession['intensity'],
     note: row.note,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -234,6 +242,7 @@ export function sportToRow(session: SportSession) {
     duration_min: session.durationMin,
     intensity: session.intensity,
     note: session.note,
+    updated_at: session.updatedAt,
   };
 }
 
@@ -243,6 +252,7 @@ export function dayStateFromRow(row: DayStateRow): DayState {
     closed: row.closed,
     closedAt: row.closed_at,
     reflection: row.reflection,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -252,6 +262,7 @@ export function dayStateToRow(state: DayState) {
     closed: state.closed,
     closed_at: state.closedAt,
     reflection: state.reflection,
+    updated_at: state.updatedAt,
   };
 }
 
@@ -264,6 +275,7 @@ export function pomodoroFromRow(row: PomodoroRow): PomodoroSession {
     actualMin: row.actual_min,
     startedAt: row.started_at,
     completed: row.completed,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -276,6 +288,7 @@ export function pomodoroToRow(session: PomodoroSession) {
     actual_min: session.actualMin,
     started_at: session.startedAt,
     completed: session.completed,
+    updated_at: session.updatedAt,
   };
 }
 

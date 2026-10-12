@@ -9,6 +9,7 @@ import type {
   Task,
   Value,
 } from '@/lib/types';
+import { writeVersioned } from '@/lib/db/versionedWrite';
 import {
   dayStateFromRow,
   dayStateToRow,
@@ -119,10 +120,57 @@ export async function loadAll(): Promise<RemoteBundle> {
   };
 }
 
-export async function upsertTasks(tasks: Task[]): Promise<void> {
-  if (!tasks.length) return;
-  const { error } = await client().from('tasks').upsert(tasks.map(taskToRow));
-  if (error) throw error;
+export interface ReconcileResult<T> {
+  serverWins: T[];
+  removedKeys: string[];
+  written: T[];
+}
+
+function asRow(value: object): Record<string, unknown> {
+  return { ...(value as Record<string, unknown>) };
+}
+
+const EMPTY_RECONCILE = { serverWins: [], removedKeys: [], written: [] };
+
+async function reconcileRows<T>(
+  items: readonly T[],
+  spec: (item: T) => {
+    table: 'tasks' | 'goals' | 'flow_values' | 'focus' | 'sport_sessions' | 'day_states' | 'pomodoro_sessions';
+    key: 'id' | 'date';
+    id: string;
+    row: Record<string, unknown>;
+    parse: (row: Record<string, unknown>) => T;
+  },
+): Promise<ReconcileResult<T>> {
+  if (!items.length) return { serverWins: [], removedKeys: [], written: [] };
+  const serverWins: T[] = [];
+  const removedKeys: string[] = [];
+  const written: T[] = [];
+  for (const item of items) {
+    const write = spec(item);
+    const base = typeof write.row.updated_at === 'string' ? write.row.updated_at : null;
+    const result = await writeVersioned({
+      ...write,
+      baseUpdatedAt: base,
+      ifMissing: 'insert',
+    });
+    if (result.status === 'ok') written.push(result.server);
+    else if (result.server) serverWins.push(result.server);
+    else removedKeys.push(write.id);
+  }
+  return { serverWins, removedKeys, written };
+}
+
+/** Last-write-wins: een oudere lokale rij overschrijft de server niet. */
+export async function upsertTasks(tasks: Task[]): Promise<ReconcileResult<Task>> {
+  if (!tasks.length) return EMPTY_RECONCILE;
+  return reconcileRows(tasks, (task) => ({
+    table: 'tasks',
+    key: 'id',
+    id: task.id,
+    row: asRow(taskToRow(task)),
+    parse: (row) => taskFromRow(row as unknown as TaskRow),
+  }));
 }
 
 export async function deleteTask(id: string): Promise<void> {
@@ -136,10 +184,14 @@ export async function deleteTasks(ids: string[]): Promise<void> {
   if (error) throw error;
 }
 
-export async function upsertGoals(goals: Goal[]): Promise<void> {
-  if (!goals.length) return;
-  const { error } = await client().from('goals').upsert(goals.map(goalToRow));
-  if (error) throw error;
+export async function upsertGoals(goals: Goal[]): Promise<ReconcileResult<Goal>> {
+  return reconcileRows(goals, (goal) => ({
+    table: 'goals',
+    key: 'id',
+    id: goal.id,
+    row: asRow(goalToRow(goal)),
+    parse: (row) => goalFromRow(row as unknown as GoalRow),
+  }));
 }
 
 export async function deleteGoal(id: string): Promise<void> {
@@ -147,10 +199,14 @@ export async function deleteGoal(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function upsertValues(values: Value[]): Promise<void> {
-  if (!values.length) return;
-  const { error } = await client().from('flow_values').upsert(values.map(valueToRow));
-  if (error) throw error;
+export async function upsertValues(values: Value[]): Promise<ReconcileResult<Value>> {
+  return reconcileRows(values, (value) => ({
+    table: 'flow_values',
+    key: 'id',
+    id: value.id,
+    row: asRow(valueToRow(value)),
+    parse: (row) => valueFromRow(row as unknown as ValueRow),
+  }));
 }
 
 export async function deleteValue(id: string): Promise<void> {
@@ -158,16 +214,26 @@ export async function deleteValue(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function upsertFocuses(focuses: Focus[]): Promise<void> {
-  if (!focuses.length) return;
-  const { error } = await client().from('focus').upsert(focuses.map(focusToRow));
-  if (error) throw error;
+export async function upsertFocuses(focuses: Focus[]): Promise<ReconcileResult<Focus>> {
+  return reconcileRows(focuses, (focus) => ({
+    table: 'focus',
+    key: 'id',
+    id: focus.id,
+    row: asRow(focusToRow(focus)),
+    parse: (row) => focusFromRow(row as unknown as FocusRow),
+  }));
 }
 
-export async function upsertSportSessions(sessions: SportSession[]): Promise<void> {
-  if (!sessions.length) return;
-  const { error } = await client().from('sport_sessions').upsert(sessions.map(sportToRow));
-  if (error) throw error;
+export async function upsertSportSessions(
+  sessions: SportSession[],
+): Promise<ReconcileResult<SportSession>> {
+  return reconcileRows(sessions, (session) => ({
+    table: 'sport_sessions',
+    key: 'id',
+    id: session.id,
+    row: asRow(sportToRow(session)),
+    parse: (row) => sportFromRow(row as unknown as SportRow),
+  }));
 }
 
 export async function deleteSportSession(id: string): Promise<void> {
@@ -175,16 +241,26 @@ export async function deleteSportSession(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function upsertDayStates(states: DayState[]): Promise<void> {
-  if (!states.length) return;
-  const { error } = await client().from('day_states').upsert(states.map(dayStateToRow));
-  if (error) throw error;
+export async function upsertDayStates(states: DayState[]): Promise<ReconcileResult<DayState>> {
+  return reconcileRows(states, (state) => ({
+    table: 'day_states',
+    key: 'date',
+    id: state.date,
+    row: asRow(dayStateToRow(state)),
+    parse: (row) => dayStateFromRow(row as unknown as DayStateRow),
+  }));
 }
 
-export async function upsertPomodoroSessions(sessions: PomodoroSession[]): Promise<void> {
-  if (!sessions.length) return;
-  const { error } = await client().from('pomodoro_sessions').upsert(sessions.map(pomodoroToRow));
-  if (error) throw error;
+export async function upsertPomodoroSessions(
+  sessions: PomodoroSession[],
+): Promise<ReconcileResult<PomodoroSession>> {
+  return reconcileRows(sessions, (session) => ({
+    table: 'pomodoro_sessions',
+    key: 'id',
+    id: session.id,
+    row: asRow(pomodoroToRow(session)),
+    parse: (row) => pomodoroFromRow(row as unknown as PomodoroRow),
+  }));
 }
 
 export async function upsertSettings(

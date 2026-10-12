@@ -11,6 +11,7 @@ import { CardModal } from '@/components/card/CardModal';
 import { ConfettiOverlay } from '@/components/ui/ConfettiOverlay';
 import { bootstrapData, forcePushLocalToRemote } from '@/lib/db/bootstrap';
 import { syncEnabled } from '@/lib/db/enabled';
+import { useVisibilitySync } from '@/lib/db/useVisibilitySync';
 import { useBoardStore } from '@/stores/useBoardStore';
 
 /**
@@ -20,6 +21,8 @@ import { useBoardStore } from '@/stores/useBoardStore';
 export function AppShell({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [syncOk, setSyncOk] = useState(true);
+
+  useVisibilitySync();
 
   useEffect(() => {
     let cancelled = false;
