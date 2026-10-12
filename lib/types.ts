@@ -60,6 +60,7 @@ export interface Goal {
   deadline: string | null;
   active: boolean;
   rank: number;
+  updatedAt: string;
 }
 
 export interface LabelDef {
@@ -84,20 +85,23 @@ export interface Idea {
   createdAt: string;
 }
 
-export interface Value  { id: string; text: string; rank: number }
+export interface Value  { id: string; text: string; rank: number; updatedAt: string }
 
 export interface SportSession {
   id: string; date: string; type: string;
   durationMin: number; intensity: 1|2|3|4|5; note: string | null;
+  updatedAt: string;
 }
 
 export interface DayState {
   date: string; closed: boolean; closedAt: string | null; reflection: string | null;
+  updatedAt: string;
 }
 
 export interface PomodoroSession {
   id: string; taskId: string | null; mode: 'focus' | 'pauze';
   plannedMin: number; actualMin: number; startedAt: string; completed: boolean;
+  updatedAt: string;
 }
 
 export interface Settings {

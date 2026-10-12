@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { setQuickWinBundleCache } from '@/lib/db/bundleCache';
 import { markSyncReady } from '@/lib/db/enabled';
 import { isRemoteEmpty, loadAll, pushAll, upsertTasks, type RemoteBundle } from '@/lib/db/sync';
+import { mergeRemoteData, itemsToPush, type MergeableStore } from '@/lib/db/merge';
+import { subscribeToRealtime } from '@/lib/db/realtime';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useFocusStore } from '@/stores/useFocusStore';
 import { useGoalsStore } from '@/stores/useGoalsStore';
@@ -52,28 +54,11 @@ function snapshotLocal(): RemoteBundle {
 
 /** Merge op id; bij conflict wint de nieuwste `updatedAt`. */
 export function mergeTasks(local: Task[], remote: Task[]): Task[] {
-  const map = new Map<string, Task>();
-  for (const t of remote) map.set(t.id, t);
-  for (const t of local) {
-    const cur = map.get(t.id);
-    if (!cur) {
-      map.set(t.id, t);
-      continue;
-    }
-    const localTs = Date.parse(t.updatedAt) || 0;
-    const remoteTs = Date.parse(cur.updatedAt) || 0;
-    if (localTs >= remoteTs) map.set(t.id, t);
-  }
-  return [...map.values()];
-}
-
-function tasksToPush(merged: Task[], remote: Task[]): Task[] {
-  const remoteById = new Map(remote.map((t) => [t.id, t]));
-  return merged.filter((t) => {
-    const r = remoteById.get(t.id);
-    if (!r) return true;
-    return (Date.parse(t.updatedAt) || 0) > (Date.parse(r.updatedAt) || 0);
-  });
+  const merged = mergeRemoteData(
+    { tasks: local, goals: [], values: [], focuses: [], sportSessions: [], dayStates: [], pomodoroSessions: [] },
+    { tasks: remote, goals: [], values: [], focuses: [], sportSessions: [], dayStates: [], pomodoroSessions: [] },
+  );
+  return merged.tasks;
 }
 
 function hydrate(remote: RemoteBundle): void {
@@ -147,19 +132,29 @@ async function bootstrapOnce(): Promise<void> {
   }
 
   // Altijd mergen i.p.v. remote blind over local te zetten (voorkomt dataverlies).
-  const mergedTasks = mergeTasks(local.tasks, remote.tasks);
+  const localStore: MergeableStore = {
+    tasks: local.tasks,
+    goals: local.goals,
+    values: local.values,
+    focuses: local.focuses,
+    sportSessions: local.sportSessions,
+    dayStates: local.dayStates,
+    pomodoroSessions: local.pomodoroSessions,
+  };
+  const remoteStore: MergeableStore = {
+    tasks: remote.tasks,
+    goals: remote.goals,
+    values: remote.values,
+    focuses: remote.focuses,
+    sportSessions: remote.sportSessions,
+    dayStates: remote.dayStates,
+    pomodoroSessions: remote.pomodoroSessions,
+  };
+
+  const mergedStore = mergeRemoteData(localStore, remoteStore);
+
   const merged: RemoteBundle = {
-    ...remote,
-    tasks: mergedTasks,
-    // Overige domeinen: remote als basis, vul aan met lokale items die remote mist.
-    goals: remote.goals.length ? remote.goals : local.goals,
-    values: remote.values.length ? remote.values : local.values,
-    focuses: remote.focuses.length ? remote.focuses : local.focuses,
-    sportSessions: remote.sportSessions.length ? remote.sportSessions : local.sportSessions,
-    dayStates: remote.dayStates.length ? remote.dayStates : local.dayStates,
-    pomodoroSessions: remote.pomodoroSessions.length
-      ? remote.pomodoroSessions
-      : local.pomodoroSessions,
+    ...mergedStore,
     settings: remote.settings ?? local.settings,
     quickWinBundles: remote.quickWinBundles.length
       ? remote.quickWinBundles
@@ -168,13 +163,15 @@ async function bootstrapOnce(): Promise<void> {
 
   hydrate(merged);
 
-  const pending = tasksToPush(mergedTasks, remote.tasks);
-  if (pending.length) {
-    await upsertTasks(pending);
+  const pendingTasks = itemsToPush(mergedStore.tasks, remote.tasks);
+  if (pendingTasks.length) {
+    await upsertTasks(pendingTasks);
   }
 
   localStorage.setItem(MIGRATED_KEY, '1');
   markSyncReady(true);
+
+  subscribeToRealtime();
 }
 
 /** Eenmalig na login: remote laden, mergen met localStorage, ontbrekende taken terugzetten. */

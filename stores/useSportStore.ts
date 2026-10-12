@@ -36,6 +36,7 @@ export const useSportStore = create<SportState>()(
 
       logSession: (input) => {
         const prev = get().sessions;
+        const now = new Date().toISOString();
         const session: SportSession = {
           id: uid(),
           date: input.date,
@@ -43,6 +44,7 @@ export const useSportStore = create<SportState>()(
           durationMin: input.durationMin,
           intensity: input.intensity,
           note: input.note ?? null,
+          updatedAt: now,
         };
         set({ sessions: [...prev, session] });
         syncSport([session], () => set({ sessions: prev }));
@@ -57,7 +59,21 @@ export const useSportStore = create<SportState>()(
         if (existed) bumpLinkedGoal(-1);
       },
     }),
-    { name: 'flow-sport' },
+    {
+      name: 'flow-sport',
+      migrate: (persisted) => {
+        const state = persisted as SportState;
+        const now = new Date().toISOString();
+        return {
+          ...state,
+          sessions: (state.sessions ?? []).map((s) => ({
+            ...s,
+            updatedAt: s.updatedAt ?? now,
+          })),
+        };
+      },
+      version: 1,
+    },
   ),
 );
 

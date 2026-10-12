@@ -75,14 +75,16 @@ export const usePomodoroStore = create<PomodoroState>()(
         const plannedMs = s.plannedMin * 60_000;
         const leftMs = s.phase === 'paused' ? (s.remainingMs ?? 0) : Math.max(0, (s.endsAt ?? 0) - Date.now());
         const actualMin = Math.round((plannedMs - leftMs) / 60_000);
+        const now = new Date().toISOString();
         const session: PomodoroSession = {
           id: uid(),
           taskId: s.taskId,
           mode: s.mode,
           plannedMin: s.plannedMin,
           actualMin: completed ? s.plannedMin : actualMin,
-          startedAt: s.startedAtISO ?? new Date().toISOString(),
+          startedAt: s.startedAtISO ?? now,
           completed,
+          updatedAt: now,
         };
         const rounds =
           completed && s.mode === 'focus' ? (s.roundsCompleted + 1) % 5 : s.roundsCompleted;
@@ -100,7 +102,21 @@ export const usePomodoroStore = create<PomodoroState>()(
 
       setTask: (taskId) => set({ taskId }),
     }),
-    { name: 'flow-pomodoro' },
+    {
+      name: 'flow-pomodoro',
+      migrate: (persisted) => {
+        const state = persisted as PomodoroState;
+        const now = new Date().toISOString();
+        return {
+          ...state,
+          sessions: (state.sessions ?? []).map((s) => ({
+            ...s,
+            updatedAt: s.updatedAt ?? now,
+          })),
+        };
+      },
+      version: 1,
+    },
   ),
 );
 

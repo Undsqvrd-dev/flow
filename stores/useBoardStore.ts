@@ -511,11 +511,13 @@ export const useBoardStore = create<BoardState>()(
 
       closeDay: (date, reflection = null) => {
         const prev = get().dayStates;
-        const state = {
+        const now = new Date().toISOString();
+        const state: DayState = {
           date,
           closed: true,
-          closedAt: new Date().toISOString(),
+          closedAt: now,
           reflection,
+          updatedAt: now,
         };
         set({ dayStates: [...prev.filter((d) => d.date !== date), state] });
         syncDayStates([state], () => set({ dayStates: prev }));
@@ -523,8 +525,9 @@ export const useBoardStore = create<BoardState>()(
 
       reopenDay: (date) => {
         const prev = get().dayStates;
+        const now = new Date().toISOString();
         const next = prev.map((d) =>
-          d.date === date ? { ...d, closed: false, closedAt: null } : d,
+          d.date === date ? { ...d, closed: false, closedAt: null, updatedAt: now } : d,
         );
         set({ dayStates: next });
         const updated = next.find((d) => d.date === date);
@@ -583,13 +586,36 @@ export const useBoardStore = create<BoardState>()(
     }),
     {
       name: 'flow-board',
+      migrate: (persisted, version) => {
+        const p = (persisted ?? {}) as {
+          tasks?: Task[];
+          dayStates?: DayState[];
+          quickWinBundles?: string[];
+          sortSnapshots?: Record<string, SortSnapshotEntry[]>;
+        };
+        const now = new Date().toISOString();
+        return {
+          tasks: migrateTasks(p.tasks ?? []),
+          dayStates: (p.dayStates ?? []).map((d) => ({
+            ...d,
+            updatedAt: d.updatedAt ?? now,
+          })),
+          quickWinBundles: migrateBundles(p.quickWinBundles ?? []),
+          sortSnapshots: p.sortSnapshots ?? {},
+        };
+      },
+      version: 1,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<BoardState>;
+        const now = new Date().toISOString();
         return {
           ...current,
           ...p,
           tasks: migrateTasks(p.tasks ?? current.tasks),
-          dayStates: p.dayStates ?? current.dayStates,
+          dayStates: (p.dayStates ?? current.dayStates).map((d) => ({
+            ...d,
+            updatedAt: d.updatedAt ?? now,
+          })),
           quickWinBundles: migrateBundles(p.quickWinBundles ?? []),
           sortSnapshots: p.sortSnapshots ?? {},
         };

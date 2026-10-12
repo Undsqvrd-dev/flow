@@ -42,6 +42,7 @@ export const useGoalsStore = create<GoalsState>()(
       values: [],
 
       addGoal: (input) => {
+        const now = new Date().toISOString();
         const goal: Goal = {
           id: uid(),
           title: input.title,
@@ -54,6 +55,7 @@ export const useGoalsStore = create<GoalsState>()(
           deadline: input.deadline ?? null,
           active: true,
           rank: nextRank(get().goals.map((g) => g.rank)),
+          updatedAt: now,
         };
         const prev = get().goals;
         set((s) => ({ goals: [...s.goals, goal] }));
@@ -62,7 +64,10 @@ export const useGoalsStore = create<GoalsState>()(
       },
       updateGoal: (id, patch) => {
         const prev = get().goals;
-        const next = prev.map((g) => (g.id === id ? { ...g, ...patch } : g));
+        const now = new Date().toISOString();
+        const next = prev.map((g) =>
+          g.id === id ? { ...g, ...patch, updatedAt: now } : g,
+        );
         set({ goals: next });
         const updated = next.find((g) => g.id === id);
         if (updated) syncGoals([updated], () => set({ goals: prev }));
@@ -74,8 +79,11 @@ export const useGoalsStore = create<GoalsState>()(
       },
       incrementGoal: (id, delta) => {
         const prev = get().goals;
+        const now = new Date().toISOString();
         const next = prev.map((g) =>
-          g.id === id ? { ...g, currentValue: Math.max(0, g.currentValue + delta) } : g,
+          g.id === id
+            ? { ...g, currentValue: Math.max(0, g.currentValue + delta), updatedAt: now }
+            : g,
         );
         set({ goals: next });
         const updated = next.find((g) => g.id === id);
@@ -84,17 +92,22 @@ export const useGoalsStore = create<GoalsState>()(
 
       addValue: (text) => {
         const prev = get().values;
+        const now = new Date().toISOString();
         const value: Value = {
           id: uid(),
           text,
           rank: nextRank(prev.map((v) => v.rank)),
+          updatedAt: now,
         };
         set({ values: [...prev, value] });
         syncValues([value], () => set({ values: prev }));
       },
       updateValue: (id, text) => {
         const prev = get().values;
-        const next = prev.map((v) => (v.id === id ? { ...v, text } : v));
+        const now = new Date().toISOString();
+        const next = prev.map((v) =>
+          v.id === id ? { ...v, text, updatedAt: now } : v,
+        );
         set({ values: next });
         const updated = next.find((v) => v.id === id);
         if (updated) syncValues([updated], () => set({ values: prev }));
@@ -107,18 +120,24 @@ export const useGoalsStore = create<GoalsState>()(
     }),
     {
       name: 'flow-goals',
-      migrate: (persisted) => {
+      migrate: (persisted, version) => {
         const state = persisted as GoalsState;
+        const now = new Date().toISOString();
         return {
           ...state,
           quotes: undefined,
           goals: (state.goals ?? []).map((g) => ({
             ...g,
             horizon: g.horizon ?? 'jaar',
+            updatedAt: g.updatedAt ?? now,
+          })),
+          values: (state.values ?? []).map((v) => ({
+            ...v,
+            updatedAt: v.updatedAt ?? now,
           })),
         };
       },
-      version: 1,
+      version: 2,
     },
   ),
 );
