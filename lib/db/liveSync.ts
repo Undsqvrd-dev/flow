@@ -1,5 +1,10 @@
 import { syncEnabled } from '@/lib/db/enabled';
-import { createRowQueue, type RowQueue, type WriteResult } from '@/lib/db/rowQueue';
+import {
+  createRowQueue,
+  TEXT_SYNC_DEBOUNCE_MS,
+  type RowQueue,
+  type WriteResult,
+} from '@/lib/db/rowQueue';
 import { writeVersioned } from '@/lib/db/versionedWrite';
 import {
   dayStateToRow,
@@ -53,6 +58,7 @@ function bindQueue<T extends { updatedAt: string }>(options: {
   write: (item: T, baseUpdatedAt: string | null) => Promise<WriteResult<T>>;
 }): RowQueue {
   return createRowQueue({
+    debounceMs: TEXT_SYNC_DEBOUNCE_MS,
     getCurrent: async (id) => (await options.getList()).find((item) => options.getId(item) === id),
     write: options.write,
     onAck: async (id, sentUpdatedAt, server) => {
@@ -327,6 +333,16 @@ export function rememberDay(date: string, updatedAt: string): void {
 
 export function rememberPomodoro(id: string, updatedAt: string): void {
   pomodoroQueue.remember(id, updatedAt);
+}
+
+export function flushPendingSync(): void {
+  taskQueue.flush();
+  goalQueue.flush();
+  valueQueue.flush();
+  focusQueue.flush();
+  sportQueue.flush();
+  dayQueue.flush();
+  pomodoroQueue.flush();
 }
 
 export function dirtyRetain(): {
