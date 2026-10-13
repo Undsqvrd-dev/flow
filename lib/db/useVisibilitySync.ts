@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { loadAll } from './sync';
 import { syncEnabled } from './enabled';
-import { dirtyRetain, rememberDay, rememberFocus, rememberGoal, rememberPomodoro, rememberSport, rememberTask, rememberValue } from './liveSync';
+import { dirtyRetain, flushPendingSync, rememberDay, rememberFocus, rememberGoal, rememberPomodoro, rememberSport, rememberTask, rememberValue } from './liveSync';
 import { mergeRemoteData, type MergeableStore } from './merge';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useGoalsStore } from '@/stores/useGoalsStore';
@@ -116,21 +116,29 @@ export function useVisibilitySync(): void {
 
   useEffect(() => {
     const handleVisibilityChange = (): void => {
-      if (document.visibilityState === 'visible') {
-        void refetchAndMerge();
+      if (document.visibilityState === 'hidden') {
+        flushPendingSync();
+        return;
       }
+      void refetchAndMerge();
     };
 
     const handleFocus = (): void => {
       void refetchAndMerge();
     };
 
+    const handlePageHide = (): void => {
+      flushPendingSync();
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('pagehide', handlePageHide);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pagehide', handlePageHide);
     };
   }, [refetchAndMerge]);
 }
