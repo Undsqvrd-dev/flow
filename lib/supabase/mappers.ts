@@ -1,3 +1,4 @@
+import { repairChecklist } from '@/lib/checklist';
 import type {
   DayState,
   Focus,
@@ -120,7 +121,7 @@ export function taskFromRow(row: TaskRow): Task {
     done: row.done,
     completedAt: row.completed_at,
     dueDate: row.due_date,
-    checklist: row.checklist ?? [],
+    checklist: repairChecklist(row.checklist, { taskId: row.id, clearWhenHealthy: true }).items,
     comments: row.comments ?? [],
     fromPreviousWeek: row.from_previous_week,
     weekOf: row.week_of,

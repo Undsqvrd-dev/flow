@@ -20,7 +20,9 @@ import {
 } from '@/lib/db/sync';
 import { timestampMs } from '@/lib/db/conflict';
 import { mergeRemoteData, itemsToPush, type MergeableStore } from '@/lib/db/merge';
+import { repairTaskChecklists } from '@/lib/checklist';
 import {
+  persistChecklistRepairs,
   rememberDay,
   rememberFocus,
   rememberGoal,
@@ -86,7 +88,7 @@ export function mergeTasks(local: Task[], remote: Task[]): Task[] {
 
 function hydrate(remote: RemoteBundle): void {
   useBoardStore.setState({
-    tasks: remote.tasks,
+    tasks: repairTaskChecklists(remote.tasks).tasks,
     dayStates: remote.dayStates,
     quickWinBundles: remote.quickWinBundles,
   });
@@ -151,6 +153,7 @@ async function bootstrapOnce(): Promise<void> {
     await pushAll(local);
     localStorage.setItem(MIGRATED_KEY, '1');
     markSyncReady(true);
+    persistChecklistRepairs();
     subscribeToRealtime();
     return;
   }
@@ -192,6 +195,7 @@ async function bootstrapOnce(): Promise<void> {
 
   localStorage.setItem(MIGRATED_KEY, '1');
   markSyncReady(true);
+  persistChecklistRepairs();
 
   subscribeToRealtime();
 }
@@ -326,6 +330,7 @@ export async function forcePushLocalToRemote(): Promise<{ taskCount: number }> {
   });
   rememberHydrated(merged);
   markSyncReady(true);
+  persistChecklistRepairs();
   subscribeToRealtime();
   return { taskCount: merged.tasks.length };
 }

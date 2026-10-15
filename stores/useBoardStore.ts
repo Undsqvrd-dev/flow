@@ -14,6 +14,7 @@ import {
 import { nextRank, prevRank, rankBetween, RANK_STEP, uid } from '@/lib/utils';
 import { QUADRANT_ORDER, quadrant } from '@/lib/priority';
 import { setQuickWinBundleCache } from '@/lib/db/bundleCache';
+import { repairChecklist } from '@/lib/checklist';
 import { UNKNOWN_UPDATED_AT } from '@/lib/db/conflict';
 import {
   syncDayStates,
@@ -111,6 +112,14 @@ function migrateTasks(tasks: Task[]): Task[] {
   return tasks.map((t) =>
     (t.dayKey as string) === 'weekend' ? { ...t, dayKey: 'za' as DayKey } : t,
   );
+}
+
+function repairStoredTasks(tasks: Task[]): Task[] {
+  return migrateTasks(tasks).map((task) => {
+    const repaired = repairChecklist(task.checklist, { taskId: task.id });
+    if (!repaired.changed && Array.isArray(task.checklist)) return task;
+    return { ...task, checklist: repaired.items };
+  });
 }
 
 /** Oude sleutels `week:dayKey:daypart` → `week:dayKey`; weekend → za. */
@@ -599,7 +608,7 @@ export const useBoardStore = create<BoardState>()(
           sortSnapshots?: Record<string, SortSnapshotEntry[]>;
         };
         return {
-          tasks: migrateTasks(p.tasks ?? []),
+          tasks: repairStoredTasks(p.tasks ?? []),
           dayStates: (p.dayStates ?? []).map((d) => ({
             ...d,
             updatedAt: d.updatedAt ?? UNKNOWN_UPDATED_AT,
@@ -614,7 +623,7 @@ export const useBoardStore = create<BoardState>()(
         return {
           ...current,
           ...p,
-          tasks: migrateTasks(p.tasks ?? current.tasks),
+          tasks: repairStoredTasks(p.tasks ?? current.tasks),
           dayStates: (p.dayStates ?? current.dayStates).map((d) => ({
             ...d,
             updatedAt: d.updatedAt ?? UNKNOWN_UPDATED_AT,

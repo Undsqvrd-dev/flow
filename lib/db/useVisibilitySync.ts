@@ -3,7 +3,8 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { loadAll } from './sync';
 import { syncEnabled } from './enabled';
-import { dirtyRetain, flushPendingSync, rememberDay, rememberFocus, rememberGoal, rememberPomodoro, rememberSport, rememberTask, rememberValue } from './liveSync';
+import { repairTaskChecklists } from '@/lib/checklist';
+import { dirtyRetain, flushPendingSync, persistChecklistRepairs, rememberDay, rememberFocus, rememberGoal, rememberPomodoro, rememberSport, rememberTask, rememberValue } from './liveSync';
 import { mergeRemoteData, type MergeableStore } from './merge';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useGoalsStore } from '@/stores/useGoalsStore';
@@ -63,8 +64,9 @@ export function useVisibilitySync(): void {
         dirtyRetain(),
       );
 
+      const tasks = repairTaskChecklists(merged.tasks).tasks;
       useBoardStore.setState({
-        tasks: merged.tasks,
+        tasks,
         dayStates: merged.dayStates,
         quickWinBundles: remote.quickWinBundles,
       });
@@ -80,7 +82,7 @@ export function useVisibilitySync(): void {
       usePomodoroStore.setState({ sessions: merged.pomodoroSessions });
 
       const dirty = dirtyRetain();
-      for (const task of merged.tasks) {
+      for (const task of tasks) {
         if (!dirty.tasks.has(task.id)) rememberTask(task.id, task.updatedAt);
       }
       for (const goal of merged.goals) {
@@ -101,6 +103,7 @@ export function useVisibilitySync(): void {
       for (const session of merged.pomodoroSessions) {
         if (!dirty.pomodoroSessions.has(session.id)) rememberPomodoro(session.id, session.updatedAt);
       }
+      persistChecklistRepairs();
 
       useSettingsStore.setState({
         settings: { ...DEFAULT_SETTINGS, ...remote.settings },
