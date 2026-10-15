@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   PointerSensor,
@@ -11,20 +11,22 @@ import {
 } from '@dnd-kit/core';
 import {
   SortableContext,
-  arrayMove,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CheckSquare, Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
+import { checklistItemIsEditing, repairChecklist, reorderChecklist } from '@/lib/checklist';
 import type { ChecklistItem } from '@/lib/types';
 import { ProgressBar } from '@/components/ui/progress';
 import { SortableChecklistItem } from './SortableChecklistItem';
-import { RANK_STEP, nextRank, uid, cn } from '@/lib/utils';
+import { nextRank, uid, cn } from '@/lib/utils';
 
 /** Checklist met voortgangsbalk, slepen en inline bewerken. */
 export function ChecklistEditor({
+  taskId,
   items,
   onChange,
 }: {
+  taskId: string;
   items: ChecklistItem[];
   onChange: (items: ChecklistItem[]) => void;
 }) {
@@ -32,36 +34,48 @@ export function ChecklistEditor({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [hideDone, setHideDone] = useState(false);
+  const repaired = useMemo(
+    () => repairChecklist(items, { taskId, track: false }),
+    [items, taskId],
+  );
+  const checklist = repaired.items;
+
+  useEffect(() => {
+    if (!repaired.changed) return;
+    onChange(checklist);
+  }, [repaired, checklist, onChange]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
 
-  const sorted = [...items].sort((a, b) => a.rank - b.rank);
-  const done = items.filter((i) => i.done).length;
+  const sorted = [...checklist].sort((a, b) => a.rank - b.rank);
+  const done = checklist.filter((i) => i.done).length;
   const visible = hideDone ? sorted.filter((i) => !i.done) : sorted;
-  const pct = items.length === 0 ? 0 : (done / items.length) * 100;
+  const pct = checklist.length === 0 ? 0 : (done / checklist.length) * 100;
 
   function add() {
     const text = draft.trim();
     if (!text) return;
     onChange([
-      ...items,
-      { id: uid(), text, done: false, rank: nextRank(items.map((i) => i.rank)) },
+      ...checklist,
+      { id: uid(), text, done: false, rank: nextRank(checklist.map((i) => i.rank)) },
     ]);
     setDraft('');
   }
 
   function toggle(id: string) {
-    onChange(items.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
+    if (!id) return;
+    onChange(checklist.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
   }
 
   function remove(id: string) {
-    onChange(items.filter((i) => i.id !== id));
+    if (!id) return;
+    onChange(checklist.filter((i) => i.id !== id));
   }
 
   function clearAll() {
-    if (items.length === 0) return;
+    if (checklist.length === 0) return;
     if (!window.confirm('Hele checklist verwijderen?')) return;
     onChange([]);
     setHideDone(false);
@@ -71,27 +85,16 @@ export function ChecklistEditor({
     if (!editingId) return;
     const text = editText.trim();
     if (!text) remove(editingId);
-    else onChange(items.map((i) => (i.id === editingId ? { ...i, text } : i)));
+    else onChange(checklist.map((i) => (i.id === editingId ? { ...i, text } : i)));
     setEditingId(null);
     setEditText('');
   }
 
   function onDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = visible.findIndex((i) => i.id === active.id);
-    const newIndex = visible.findIndex((i) => i.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-
-    const moved = arrayMove(visible, oldIndex, newIndex);
-    let next: ChecklistItem[];
-    if (!hideDone) {
-      next = moved;
-    } else {
-      let vi = 0;
-      next = sorted.map((item) => (item.done ? item : moved[vi++]));
-    }
-    onChange(next.map((item, i) => ({ ...item, rank: (i + 1) * RANK_STEP })));
+    if (!over) return;
+    const next = reorderChecklist(checklist, String(active.id), String(over.id), hideDone);
+    if (next) onChange(next);
   }
 
   return (
@@ -101,7 +104,7 @@ export function ChecklistEditor({
           <CheckSquare size={13} strokeWidth={1.75} className="text-muted" />
           Checklist
         </span>
-        {items.length > 0 && (
+        {checklist.length > 0 && (
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
             <button
               type="button"
@@ -131,7 +134,7 @@ export function ChecklistEditor({
         )}
       </div>
 
-      {items.length > 0 && (
+      {checklist.length > 0 && (
         <div className="mb-2 flex items-center gap-2">
           <span className="w-8 shrink-0 text-[11px] font-semibold tabular-nums text-muted">
             {Math.round(pct)}%
@@ -147,7 +150,7 @@ export function ChecklistEditor({
               <SortableChecklistItem
                 key={item.id}
                 item={item}
-                editing={editingId === item.id}
+                editing={checklistItemIsEditing(item.id, editingId)}
                 editText={editText}
                 onToggle={() => toggle(item.id)}
                 onRemove={() => remove(item.id)}

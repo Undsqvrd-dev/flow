@@ -1,3 +1,9 @@
+import {
+  CHECKLIST_REPAIR_ATTEMPTS,
+  checklistRepairsPending,
+  claimChecklistRepairs,
+  clearChecklistRepair,
+} from '@/lib/checklist';
 import { syncEnabled } from '@/lib/db/enabled';
 import {
   createRowQueue,
@@ -56,6 +62,7 @@ function bindQueue<T extends { updatedAt: string }>(options: {
   getList: () => Promise<T[]>;
   setList: (items: T[]) => Promise<void>;
   write: (item: T, baseUpdatedAt: string | null) => Promise<WriteResult<T>>;
+  afterSettle?: () => void;
 }): RowQueue {
   return createRowQueue({
     debounceMs: TEXT_SYNC_DEBOUNCE_MS,
@@ -70,12 +77,18 @@ function bindQueue<T extends { updatedAt: string }>(options: {
             : item,
         ),
       );
+      options.afterSettle?.();
     },
     onConflict: async (id, server) => {
       const list = await options.getList();
       await options.setList(replaceBy(list, id, server, options.getId));
+      options.afterSettle?.();
     },
   });
+}
+
+function scheduleChecklistRepair(): void {
+  setTimeout(() => persistChecklistRepairs(), 0);
 }
 
 const taskQueue = bindQueue<Task>({
@@ -84,16 +97,23 @@ const taskQueue = bindQueue<Task>({
   setList: async (tasks) => {
     (await import('@/stores/useBoardStore')).useBoardStore.setState({ tasks });
   },
-  write: (task, baseUpdatedAt) =>
-    writeVersioned({
-      table: 'tasks',
-      key: 'id',
-      id: task.id,
-      row: asRow(taskToRow(task)),
-      baseUpdatedAt,
-      ifMissing: 'remove',
-      parse: (row) => taskFromRow(row as unknown as TaskRow),
-    }),
+  afterSettle: scheduleChecklistRepair,
+  write: async (task, baseUpdatedAt) => {
+    try {
+      return await writeVersioned({
+        table: 'tasks',
+        key: 'id',
+        id: task.id,
+        row: asRow(taskToRow(task)),
+        baseUpdatedAt,
+        ifMissing: 'remove',
+        parse: (row) => taskFromRow(row as unknown as TaskRow),
+      });
+    } catch (err) {
+      scheduleChecklistRepair();
+      throw err;
+    }
+  },
 });
 
 const goalQueue = bindQueue<Goal>({
@@ -221,6 +241,41 @@ function enqueue<T extends { updatedAt: string }>(
 
 export function enqueueTasks(tasks: readonly Task[], previous: readonly Task[], rollback: () => void): void {
   enqueue(taskQueue, tasks, previous, (task) => task.id, rollback);
+}
+
+let checklistRepairQueued = false;
+
+/**
+ * Schrijft checklist-id's die we lokaal hebben aangevuld.
+ * De base blijft de `updatedAt` die de client al kende, zodat een nieuwere
+ * serverrij deze reparatie nog steeds weigert.
+ */
+export function persistChecklistRepairs(): void {
+  if (!syncEnabled()) return;
+  if (checklistRepairsPending().size === 0 || checklistRepairQueued) return;
+  checklistRepairQueued = true;
+  void (async () => {
+    try {
+      const { useBoardStore } = await import('@/stores/useBoardStore');
+      const ids = claimChecklistRepairs(taskQueue.dirtyIds(), CHECKLIST_REPAIR_ATTEMPTS);
+      if (!ids.length) return;
+      const tasks = useBoardStore.getState().tasks;
+      const byId = new Map(tasks.map((task) => [task.id, task]));
+      const todo: Task[] = [];
+      for (const id of ids) {
+        const task = byId.get(id);
+        if (!task) {
+          clearChecklistRepair(id);
+          continue;
+        }
+        todo.push(task);
+      }
+      if (!todo.length) return;
+      enqueueTasks(todo, tasks, () => {});
+    } finally {
+      checklistRepairQueued = false;
+    }
+  })();
 }
 
 export function enqueueGoals(goals: readonly Goal[], previous: readonly Goal[], rollback: () => void): void {

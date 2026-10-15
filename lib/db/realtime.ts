@@ -18,6 +18,7 @@ import {
   type DayStateRow,
   type PomodoroRow,
 } from '@/lib/supabase/mappers';
+import { repairTaskChecklists } from '@/lib/checklist';
 import { applyDelete, applyUpsert } from '@/lib/db/applyRemote';
 import {
   dayDirtyIds,
@@ -29,6 +30,7 @@ import {
   rememberGoal,
   rememberPomodoro,
   rememberSport,
+  persistChecklistRepairs,
   rememberTask,
   rememberValue,
   sportDirtyIds,
@@ -64,10 +66,13 @@ function handleTaskChange(payload: RealtimePayload): void {
     return;
   }
   const task = taskFromRow(payload.new as unknown as TaskRow);
-  const next = applyUpsert(state.tasks, task, (item) => item.id, taskDirtyIds());
-  if (next === state.tasks) return;
-  useBoardStore.setState({ tasks: next });
-  rememberTask(task.id, task.updatedAt);
+  const applied = applyUpsert(state.tasks, task, (item) => item.id, taskDirtyIds());
+  const repaired = repairTaskChecklists(applied);
+  if (repaired.changed || applied !== state.tasks) {
+    useBoardStore.setState({ tasks: repaired.tasks });
+  }
+  if (applied !== state.tasks) rememberTask(task.id, task.updatedAt);
+  persistChecklistRepairs();
 }
 
 function handleGoalChange(payload: RealtimePayload): void {

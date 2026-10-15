@@ -98,16 +98,17 @@ export function LinkedTaskChecklist() {
     <div className="w-full max-w-sm rounded-card border border-line bg-surface p-3.5">
       <p className="panel-label mb-2">Checklist</p>
       <ul className="flex flex-col gap-1">
-        {[...task.checklist].sort((a, b) => a.rank - b.rank).map((item) => (
-          <li key={item.id} className="flex items-center gap-2">
+        {[...task.checklist].sort((a, b) => a.rank - b.rank).map((item, index) => (
+          <li key={item.id || `step-${index}`} className="flex items-center gap-2">
             <input
               type="checkbox"
               checked={item.done}
-              onChange={() =>
+              onChange={() => {
+                if (!item.id) return;
                 updateTask(task.id, {
                   checklist: task.checklist.map((c) => (c.id === item.id ? { ...c, done: !c.done } : c)),
-                })
-              }
+                });
+              }}
               className="h-4 w-4 cursor-pointer accent-(--green)"
             />
             <span className={cn('text-[13px] text-txt-2', item.done && 'text-muted line-through')}>{item.text}</span>

@@ -121,6 +121,7 @@ export function CardModal() {
 
               <section>
                 <ChecklistEditor
+                  taskId={t.id}
                   items={t.checklist}
                   onChange={(checklist) => updateTask(t.id, { checklist })}
                 />
