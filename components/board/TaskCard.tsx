@@ -5,6 +5,8 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ChevronDown, ChevronUp, CheckSquare, Clock, AlignLeft, Bell } from 'lucide-react';
 import type { Task } from '@/lib/types';
+import { meditationDate } from '@/lib/meditation';
+import { MeditationStreakMark } from './MeditationStreakMark';
 import { TaskCardContextMenu } from './TaskCardContextMenu';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useGoalsStore, goalById } from '@/stores/useGoalsStore';
@@ -108,6 +110,12 @@ export function TaskCard({ task, sortable = true }: { task: Task; sortable?: boo
             )}
             {task.title}
           </p>
+
+          {meditationDate(task) && (
+            <span className="mt-0.5">
+              <MeditationStreakMark ritualKey={task.ritualKey} />
+            </span>
+          )}
 
           {sortable && !task.done && (
             <div className="invisible flex shrink-0 flex-col gap-0.5 group-hover:visible">
