@@ -4,7 +4,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { loadAll } from './sync';
 import { syncEnabled } from './enabled';
 import { repairTaskChecklists } from '@/lib/checklist';
-import { ensureTodayMeditation } from '@/lib/db/ensureMeditation';
+import { ensureTodayRituals } from '@/lib/db/ensureMeditation';
 import { dirtyRetain, flushPendingSync, persistChecklistRepairs, rememberDay, rememberFocus, rememberGoal, rememberPomodoro, rememberTask, rememberValue } from './liveSync';
 import { mergeRemoteData, type MergeableStore } from './merge';
 import { useBoardStore } from '@/stores/useBoardStore';
@@ -97,7 +97,7 @@ export function useVisibilitySync(): void {
         if (!dirty.pomodoroSessions.has(session.id)) rememberPomodoro(session.id, session.updatedAt);
       }
       persistChecklistRepairs();
-      await ensureTodayMeditation();
+      await ensureTodayRituals();
 
       useSettingsStore.setState({
         settings: { ...DEFAULT_SETTINGS, ...remote.settings },
