@@ -4,7 +4,6 @@ import type {
   Goal,
   Value,
   Focus,
-  SportSession,
   DayState,
   PomodoroSession,
 } from '@/lib/types';
@@ -14,7 +13,6 @@ export interface MergeableStore {
   goals: Goal[];
   values: Value[];
   focuses: Focus[];
-  sportSessions: SportSession[];
   dayStates: DayState[];
   pomodoroSessions: PomodoroSession[];
 }
@@ -27,7 +25,6 @@ export interface RetainLocalIds {
   goals?: ReadonlySet<string>;
   values?: ReadonlySet<string>;
   focuses?: ReadonlySet<string>;
-  sportSessions?: ReadonlySet<string>;
   dayStates?: ReadonlySet<string>;
   pomodoroSessions?: ReadonlySet<string>;
 }
@@ -105,7 +102,6 @@ export function mergeRemoteData(
     goals: mergeById(local.goals, remote.goals, retain.goals ?? EMPTY),
     values: mergeById(local.values, remote.values, retain.values ?? EMPTY),
     focuses: mergeById(local.focuses, remote.focuses, retain.focuses ?? EMPTY),
-    sportSessions: mergeById(local.sportSessions, remote.sportSessions, retain.sportSessions ?? EMPTY),
     dayStates: mergeByKey(local.dayStates, remote.dayStates, (d) => d.date, retain.dayStates ?? EMPTY),
     pomodoroSessions: mergeById(
       local.pomodoroSessions,

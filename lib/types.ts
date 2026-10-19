@@ -32,6 +32,7 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   fromPreviousWeek?: boolean;   // badge "van vorige week" na weekrollover
+  ritualKey?: string | null;    // bv. mediteren:2026-10-19 — één taak per dag
 }
 
 export interface ChecklistItem { id: string; text: string; done: boolean; rank: number }
@@ -87,12 +88,6 @@ export interface Idea {
 
 export interface Value  { id: string; text: string; rank: number; updatedAt: string }
 
-export interface SportSession {
-  id: string; date: string; type: string;
-  durationMin: number; intensity: 1|2|3|4|5; note: string | null;
-  updatedAt: string;
-}
-
 export interface DayState {
   date: string; closed: boolean; closedAt: string | null; reflection: string | null;
   updatedAt: string;
@@ -113,7 +108,7 @@ export interface Settings {
   pomodoroLongBreakMin: number;  // 15
   pomodoroUntilLongBreak: number;// 4
   quickWinThresholdMin: number;  // 5
-  sportWeeklyTarget: number;     // 4
+  sportWeeklyTarget: number;     // niet meer in de UI; blijft in de opgeslagen instellingen
   alarmSound: 'bel' | 'gong' | 'piep';
   showPriorityBadges: boolean;   // kwadrantlabels op kaarten aan/uit — default aan
   askDayFocusOnOpen: boolean;    // ochtendvraag — default aan

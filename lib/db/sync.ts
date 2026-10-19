@@ -5,7 +5,6 @@ import type {
   Goal,
   PomodoroSession,
   Settings,
-  SportSession,
   Task,
   Value,
 } from '@/lib/types';
@@ -21,8 +20,6 @@ import {
   pomodoroToRow,
   settingsFromRow,
   settingsToData,
-  sportFromRow,
-  sportToRow,
   taskFromRow,
   taskToRow,
   valueFromRow,
@@ -32,7 +29,6 @@ import {
   type GoalRow,
   type PomodoroRow,
   type SettingsRow,
-  type SportRow,
   type TaskRow,
   type ValueRow,
 } from '@/lib/supabase/mappers';
@@ -42,7 +38,6 @@ export type RemoteBundle = {
   goals: Goal[];
   values: Value[];
   focuses: Focus[];
-  sportSessions: SportSession[];
   dayStates: DayState[];
   pomodoroSessions: PomodoroSession[];
   settings: Settings;
@@ -59,7 +54,6 @@ export function isRemoteEmpty(data: RemoteBundle): boolean {
     data.goals.length === 0 &&
     data.values.length === 0 &&
     data.focuses.length === 0 &&
-    data.sportSessions.length === 0 &&
     data.dayStates.length === 0 &&
     data.pomodoroSessions.length === 0
   );
@@ -73,7 +67,6 @@ export async function loadAll(): Promise<RemoteBundle> {
     goalsRes,
     valuesRes,
     focusRes,
-    sportRes,
     dayRes,
     pomoRes,
     settingsRes,
@@ -82,7 +75,6 @@ export async function loadAll(): Promise<RemoteBundle> {
     supabase.from('goals').select('*'),
     supabase.from('flow_values').select('*'),
     supabase.from('focus').select('*'),
-    supabase.from('sport_sessions').select('*'),
     supabase.from('day_states').select('*'),
     supabase.from('pomodoro_sessions').select('*'),
     supabase.from('settings').select('*').maybeSingle(),
@@ -93,7 +85,6 @@ export async function loadAll(): Promise<RemoteBundle> {
     goalsRes.error,
     valuesRes.error,
     focusRes.error,
-    sportRes.error,
     dayRes.error,
     pomoRes.error,
     settingsRes.error,
@@ -112,7 +103,6 @@ export async function loadAll(): Promise<RemoteBundle> {
     goals: ((goalsRes.data ?? []) as GoalRow[]).map(goalFromRow),
     values: ((valuesRes.data ?? []) as ValueRow[]).map(valueFromRow),
     focuses: ((focusRes.data ?? []) as FocusRow[]).map(focusFromRow),
-    sportSessions: ((sportRes.data ?? []) as SportRow[]).map(sportFromRow),
     dayStates: ((dayRes.data ?? []) as DayStateRow[]).map(dayStateFromRow),
     pomodoroSessions: ((pomoRes.data ?? []) as PomodoroRow[]).map(pomodoroFromRow),
     settings,
@@ -135,7 +125,7 @@ const EMPTY_RECONCILE = { serverWins: [], removedKeys: [], written: [] };
 async function reconcileRows<T>(
   items: readonly T[],
   spec: (item: T) => {
-    table: 'tasks' | 'goals' | 'flow_values' | 'focus' | 'sport_sessions' | 'day_states' | 'pomodoro_sessions';
+    table: 'tasks' | 'goals' | 'flow_values' | 'focus' | 'day_states' | 'pomodoro_sessions';
     key: 'id' | 'date';
     id: string;
     row: Record<string, unknown>;
@@ -224,23 +214,6 @@ export async function upsertFocuses(focuses: Focus[]): Promise<ReconcileResult<F
   }));
 }
 
-export async function upsertSportSessions(
-  sessions: SportSession[],
-): Promise<ReconcileResult<SportSession>> {
-  return reconcileRows(sessions, (session) => ({
-    table: 'sport_sessions',
-    key: 'id',
-    id: session.id,
-    row: asRow(sportToRow(session)),
-    parse: (row) => sportFromRow(row as unknown as SportRow),
-  }));
-}
-
-export async function deleteSportSession(id: string): Promise<void> {
-  const { error } = await client().from('sport_sessions').delete().eq('id', id);
-  if (error) throw error;
-}
-
 export async function upsertDayStates(states: DayState[]): Promise<ReconcileResult<DayState>> {
   return reconcileRows(states, (state) => ({
     table: 'day_states',
@@ -285,7 +258,6 @@ export async function pushAll(data: RemoteBundle): Promise<void> {
   await upsertValues(data.values);
   await upsertTasks(data.tasks);
   await upsertFocuses(data.focuses);
-  await upsertSportSessions(data.sportSessions);
   await upsertDayStates(data.dayStates);
   await upsertPomodoroSessions(data.pomodoroSessions);
   await upsertSettings(data.settings, data.quickWinBundles);

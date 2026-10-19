@@ -7,7 +7,7 @@ import { WeekTargetCard } from './WeekTargetCard';
 import { YearGoalCard } from './YearGoalCard';
 import { TimerCard } from './TimerCard';
 import { MoodQuoteRow } from './MoodQuoteRow';
-import { SportPanel } from '@/components/sport/SportWidgets';
+import { MeditationStreakCard } from './MeditationStreakCard';
 import { Button } from '@/components/ui/button';
 import { useUiStore } from '@/stores/useUiStore';
 
@@ -41,7 +41,7 @@ export function DashboardPage() {
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <WeekTargetCard />
         <YearGoalCard />
-        <SportPanel />
+        <MeditationStreakCard />
       </div>
 
       <div className="mt-4">

@@ -7,14 +7,12 @@ import {
   goalFromRow,
   valueFromRow,
   focusFromRow,
-  sportFromRow,
   dayStateFromRow,
   pomodoroFromRow,
   type TaskRow,
   type GoalRow,
   type ValueRow,
   type FocusRow,
-  type SportRow,
   type DayStateRow,
   type PomodoroRow,
 } from '@/lib/supabase/mappers';
@@ -29,18 +27,15 @@ import {
   rememberFocus,
   rememberGoal,
   rememberPomodoro,
-  rememberSport,
   persistChecklistRepairs,
   rememberTask,
   rememberValue,
-  sportDirtyIds,
   taskDirtyIds,
   valueDirtyIds,
 } from '@/lib/db/liveSync';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useGoalsStore } from '@/stores/useGoalsStore';
 import { useFocusStore } from '@/stores/useFocusStore';
-import { useSportStore } from '@/stores/useSportStore';
 import { usePomodoroStore } from '@/stores/usePomodoroStore';
 
 interface RealtimePayload {
@@ -120,21 +115,6 @@ function handleFocusChange(payload: RealtimePayload): void {
   rememberFocus(focus.id, focus.updatedAt);
 }
 
-function handleSportChange(payload: RealtimePayload): void {
-  const state = useSportStore.getState();
-  if (payload.eventType === 'DELETE') {
-    useSportStore.setState({
-      sessions: applyDelete(state.sessions, textField(payload.old, 'id'), (session) => session.id),
-    });
-    return;
-  }
-  const session = sportFromRow(payload.new as unknown as SportRow);
-  const next = applyUpsert(state.sessions, session, (item) => item.id, sportDirtyIds());
-  if (next === state.sessions) return;
-  useSportStore.setState({ sessions: next });
-  rememberSport(session.id, session.updatedAt);
-}
-
 function handleDayStateChange(payload: RealtimePayload): void {
   const state = useBoardStore.getState();
   if (payload.eventType === 'DELETE') {
@@ -191,11 +171,6 @@ export function subscribeToRealtime(): void {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'focus' },
       handleFocusChange,
-    )
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'sport_sessions' },
-      handleSportChange,
     )
     .on(
       'postgres_changes',

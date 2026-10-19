@@ -6,7 +6,6 @@ type SyncTable =
   | 'goals'
   | 'flow_values'
   | 'focus'
-  | 'sport_sessions'
   | 'day_states'
   | 'pomodoro_sessions';
 
