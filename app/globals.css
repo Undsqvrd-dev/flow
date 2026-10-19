@@ -120,3 +120,61 @@ h1, h2, h3 {
   }
 }
 
+/* Meditatie-streak: zacht ochtendverloop, leesbaar in licht en donker. */
+.meditation-streak-tile {
+  --meditation-ink: #173028;
+  --meditation-ink-soft: #3c5348;
+  --meditation-icon: #1a6840;
+  background: linear-gradient(150deg, #f8dc96 0%, #e6f2bc 48%, #c9e7d8 100%);
+  border: 1px solid rgba(26, 104, 64, 0.16);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.dark .meditation-streak-tile {
+  --meditation-ink: #f3f7f4;
+  --meditation-ink-soft: #d3e3da;
+  --meditation-icon: #b7e7c9;
+  background: linear-gradient(150deg, #5a4014 0%, #2c4634 50%, #16352c 100%);
+  border-color: rgba(183, 231, 201, 0.18);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.meditation-streak-icon {
+  color: var(--meditation-icon);
+}
+
+.meditation-streak-watermark {
+  color: var(--meditation-icon);
+  opacity: 0.16;
+}
+
+.meditation-streak-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--meditation-ink-soft);
+}
+
+.meditation-streak-count {
+  font-size: 72px;
+  font-weight: 700;
+  line-height: 0.85;
+  letter-spacing: -0.045em;
+  color: var(--meditation-ink);
+}
+
+.meditation-streak-longest {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--meditation-ink);
+}
+
+.meditation-streak-caption {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--meditation-ink-soft);
+}
+
