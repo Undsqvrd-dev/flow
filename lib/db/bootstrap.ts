@@ -20,7 +20,7 @@ import {
 import { timestampMs } from '@/lib/db/conflict';
 import { mergeRemoteData, itemsToPush, type MergeableStore } from '@/lib/db/merge';
 import { repairTaskChecklists } from '@/lib/checklist';
-import { ensureTodayMeditation } from '@/lib/db/ensureMeditation';
+import { ensureTodayRituals } from '@/lib/db/ensureMeditation';
 import {
   persistChecklistRepairs,
   rememberDay,
@@ -148,7 +148,7 @@ async function bootstrapOnce(): Promise<void> {
     markSyncReady(true);
     persistChecklistRepairs();
     subscribeToRealtime();
-    await ensureTodayMeditation();
+    await ensureTodayRituals();
     return;
   }
 
@@ -190,7 +190,7 @@ async function bootstrapOnce(): Promise<void> {
   persistChecklistRepairs();
 
   subscribeToRealtime();
-  await ensureTodayMeditation();
+  await ensureTodayRituals();
 }
 
 function rememberHydrated(data: MergeableStore): void {
@@ -316,6 +316,6 @@ export async function forcePushLocalToRemote(): Promise<{ taskCount: number }> {
   markSyncReady(true);
   persistChecklistRepairs();
   subscribeToRealtime();
-  await ensureTodayMeditation();
+  await ensureTodayRituals();
   return { taskCount: merged.tasks.length };
 }

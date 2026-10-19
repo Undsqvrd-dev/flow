@@ -32,7 +32,7 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   fromPreviousWeek?: boolean;   // badge "van vorige week" na weekrollover
-  ritualKey?: string | null;    // bv. mediteren:2026-10-19 — één taak per dag
+  ritualKey?: string | null;    // bv. mediteren:2026-10-19 of dagafsluiting:2026-10-19
 }
 
 export interface ChecklistItem { id: string; text: string; done: boolean; rank: number }

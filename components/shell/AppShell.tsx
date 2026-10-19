@@ -10,7 +10,7 @@ import { QuickCapture } from './QuickCapture';
 import { CardModal } from '@/components/card/CardModal';
 import { ConfettiOverlay } from '@/components/ui/ConfettiOverlay';
 import { bootstrapData, forcePushLocalToRemote } from '@/lib/db/bootstrap';
-import { ensureTodayMeditation } from '@/lib/db/ensureMeditation';
+import { ensureTodayRituals } from '@/lib/db/ensureMeditation';
 import { syncEnabled } from '@/lib/db/enabled';
 import { useVisibilitySync } from '@/lib/db/useVisibilitySync';
 import { useBoardStore } from '@/stores/useBoardStore';
@@ -31,7 +31,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       const next = new Date(now);
       next.setHours(24, 0, 2, 0);
       return window.setTimeout(() => {
-        void ensureTodayMeditation();
+        void ensureTodayRituals();
         timer = arm();
       }, Math.max(1000, next.getTime() - now.getTime()));
     };

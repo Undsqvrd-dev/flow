@@ -9,6 +9,7 @@ import { taskFromRow, type TaskRow } from '@/lib/supabase/mappers';
 import { useBoardStore } from '@/stores/useBoardStore';
 
 let warned = false;
+let warnedRituals = false;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -33,11 +34,40 @@ export async function ensureTodayMeditation(date = todayISO()): Promise<void> {
     return;
   }
   if (!isRecord(data)) return;
+  applyRitualRow(data);
+}
 
-  const task = taskFromRow(data as unknown as TaskRow);
+function applyRitualRow(row: Record<string, unknown>): void {
+  const task = taskFromRow(row as unknown as TaskRow);
   const state = useBoardStore.getState();
   const next = applyUpsert(state.tasks, task, (item) => item.id, taskDirtyIds());
   if (next === state.tasks) return;
   useBoardStore.setState({ tasks: next });
   rememberTask(task.id, task.updatedAt);
+}
+
+/**
+ * Mediteren én Dagafsluiting voor deze lokale dag.
+ * Bestaat de nieuwe RPC nog niet, dan blijft Mediteren via migratie 006 werken.
+ */
+export async function ensureTodayRituals(date = todayISO()): Promise<void> {
+  if (!syncEnabled()) return;
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('ensure_daily_rituals', { p_date: date });
+  if (error) {
+    if (!warnedRituals) {
+      warnedRituals = true;
+      console.error(
+        '[flow rituelen] ensure_daily_rituals mislukt. Draai migratie 007 op de database. Mediteren blijft via 006.',
+        error,
+      );
+    }
+    await ensureTodayMeditation(date);
+    return;
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  for (const row of rows) {
+    if (isRecord(row)) applyRitualRow(row);
+  }
 }

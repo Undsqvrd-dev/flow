@@ -15,6 +15,7 @@ import { nextRank, prevRank, rankBetween, RANK_STEP, uid } from '@/lib/utils';
 import { QUADRANT_ORDER, quadrant } from '@/lib/priority';
 import { setQuickWinBundleCache } from '@/lib/db/bundleCache';
 import { repairChecklist } from '@/lib/checklist';
+import { compareDayTasks, isClosingRitual } from '@/lib/closing';
 import { UNKNOWN_UPDATED_AT } from '@/lib/db/conflict';
 import {
   syncDayStates,
@@ -147,7 +148,8 @@ function resolveRank(
       return rankBetween(before, after);
     }
   }
-  const ranks = sorted.map((t) => t.rank);
+  const peers = input.position === 'start' ? sorted : sorted.filter((t) => !isClosingRitual(t));
+  const ranks = peers.map((t) => t.rank);
   return input.position === 'start' ? prevRank(ranks) : nextRank(ranks);
 }
 
@@ -227,6 +229,7 @@ export const useBoardStore = create<BoardState>()(
           done: false,
           completedAt: null,
           rank: src.rank + RANK_STEP / 2,
+          ritualKey: null,
           checklist: src.checklist.map((c) => ({ ...c, id: uid(), done: false })),
           comments: [],
           createdAt: now,
@@ -656,7 +659,7 @@ export function openTasksFor(
         !t.done &&
         sameSection(t, dayKey, daypart, isBoardDayKey(dayKey) ? columnWeekOf : undefined),
     )
-    .sort((a, b) => a.rank - b.rank);
+    .sort(compareDayTasks);
 }
 
 export function openTasksForDay(
@@ -670,7 +673,7 @@ export function openTasksForDay(
       if (isBoardDayKey(dayKey) && columnWeekOf) return t.weekOf === columnWeekOf;
       return true;
     })
-    .sort((a, b) => a.rank - b.rank);
+    .sort(compareDayTasks);
 }
 
 /** Open taken voor een kalenderdatum (dayKey + weekOf van die datum). */
@@ -688,7 +691,7 @@ export function openTasksForDate(
       if (daypart !== undefined) return t.daypart === daypart;
       return true;
     })
-    .sort((a, b) => a.rank - b.rank);
+    .sort(compareDayTasks);
 }
 
 /**
@@ -728,7 +731,8 @@ export function todayOpenCount(tasks: Task[], key: DayKey = 'algemeen'): number 
   return tasks.filter((t) => !t.done && t.dayKey === key).length;
 }
 
-export function isQuickWin(t: Task, thresholdMin: number): boolean {
+export function isQuickWin(t: Pick<Task, 'done' | 'estimateMin' | 'ritualKey'>, thresholdMin: number): boolean {
+  if (isClosingRitual(t)) return false;
   return !t.done && t.estimateMin !== null && t.estimateMin <= thresholdMin;
 }
 
