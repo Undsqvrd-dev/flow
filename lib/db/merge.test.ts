@@ -49,7 +49,6 @@ function emptyStore(): MergeableStore {
     goals: [],
     values: [],
     focuses: [],
-    sportSessions: [],
     dayStates: [],
     pomodoroSessions: [],
   };

@@ -16,7 +16,6 @@ const TITLES: Record<string, string> = {
   '/focus': 'Timer',
   '/dump': 'Inspiratie',
   '/goals': 'Doelen & waarden',
-  '/sport': 'Sport',
   '/analytics': 'Analytics',
   '/settings': 'Instellingen',
 };

@@ -4,24 +4,21 @@ import {
   enqueueFocuses,
   enqueueGoals,
   enqueuePomodoro,
-  enqueueSport,
   enqueueTasks,
   enqueueValues,
   forgetGoal,
-  forgetSport,
   forgetTask,
   forgetValue,
 } from '@/lib/db/liveSync';
 import {
   deleteGoal,
-  deleteSportSession,
   deleteTask,
   deleteTasks,
   deleteValue,
   runSync,
   upsertSettings,
 } from '@/lib/db/sync';
-import type { DayState, Focus, Goal, PomodoroSession, Settings, SportSession, Task, Value } from '@/lib/types';
+import type { DayState, Focus, Goal, PomodoroSession, Settings, Task, Value } from '@/lib/types';
 
 export function syncTasks(tasks: Task[], previous: readonly Task[], rollback: () => void): void {
   if (!syncEnabled()) {
@@ -68,21 +65,6 @@ export function syncRemoveValue(id: string, rollback: () => void): void {
 export function syncFocuses(focuses: Focus[], previous: readonly Focus[], rollback: () => void): void {
   if (!syncEnabled()) return;
   enqueueFocuses(focuses, previous, rollback);
-}
-
-export function syncSport(
-  sessions: SportSession[],
-  previous: readonly SportSession[],
-  rollback: () => void,
-): void {
-  if (!syncEnabled()) return;
-  enqueueSport(sessions, previous, rollback);
-}
-
-export function syncRemoveSport(id: string, rollback: () => void): void {
-  if (!syncEnabled()) return;
-  forgetSport(id);
-  runSync(() => deleteSportSession(id), rollback);
 }
 
 export function syncDayStates(

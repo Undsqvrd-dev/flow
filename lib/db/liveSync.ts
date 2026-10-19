@@ -17,25 +17,22 @@ import {
   focusToRow,
   goalToRow,
   pomodoroToRow,
-  sportToRow,
   taskFromRow,
   taskToRow,
   goalFromRow,
   valueFromRow,
   valueToRow,
   focusFromRow,
-  sportFromRow,
   dayStateFromRow,
   pomodoroFromRow,
   type DayStateRow,
   type FocusRow,
   type GoalRow,
   type PomodoroRow,
-  type SportRow,
   type TaskRow,
   type ValueRow,
 } from '@/lib/supabase/mappers';
-import type { DayState, Focus, Goal, PomodoroSession, SportSession, Task, Value } from '@/lib/types';
+import type { DayState, Focus, Goal, PomodoroSession, Task, Value } from '@/lib/types';
 
 function asRow(value: object): Record<string, unknown> {
   return { ...(value as Record<string, unknown>) };
@@ -170,24 +167,6 @@ const focusQueue = bindQueue<Focus>({
     }),
 });
 
-const sportQueue = bindQueue<SportSession>({
-  getId: (session) => session.id,
-  getList: async () => (await import('@/stores/useSportStore')).useSportStore.getState().sessions,
-  setList: async (sessions) => {
-    (await import('@/stores/useSportStore')).useSportStore.setState({ sessions });
-  },
-  write: (session, baseUpdatedAt) =>
-    writeVersioned({
-      table: 'sport_sessions',
-      key: 'id',
-      id: session.id,
-      row: asRow(sportToRow(session)),
-      baseUpdatedAt,
-      ifMissing: 'remove',
-      parse: (row) => sportFromRow(row as unknown as SportRow),
-    }),
-});
-
 const dayQueue = bindQueue<DayState>({
   getId: (state) => state.date,
   getList: async () => (await import('@/stores/useBoardStore')).useBoardStore.getState().dayStates,
@@ -294,14 +273,6 @@ export function enqueueFocuses(
   enqueue(focusQueue, focuses, previous, (focus) => focus.id, rollback);
 }
 
-export function enqueueSport(
-  sessions: readonly SportSession[],
-  previous: readonly SportSession[],
-  rollback: () => void,
-): void {
-  enqueue(sportQueue, sessions, previous, (session) => session.id, rollback);
-}
-
 export function enqueueDayStates(
   states: readonly DayState[],
   previous: readonly DayState[],
@@ -330,10 +301,6 @@ export function forgetValue(id: string): void {
   valueQueue.forget(id);
 }
 
-export function forgetSport(id: string): void {
-  sportQueue.forget(id);
-}
-
 export function taskDirtyIds(): ReadonlySet<string> {
   return taskQueue.dirtyIds();
 }
@@ -348,10 +315,6 @@ export function valueDirtyIds(): ReadonlySet<string> {
 
 export function focusDirtyIds(): ReadonlySet<string> {
   return focusQueue.dirtyIds();
-}
-
-export function sportDirtyIds(): ReadonlySet<string> {
-  return sportQueue.dirtyIds();
 }
 
 export function dayDirtyIds(): ReadonlySet<string> {
@@ -378,10 +341,6 @@ export function rememberFocus(id: string, updatedAt: string): void {
   focusQueue.remember(id, updatedAt);
 }
 
-export function rememberSport(id: string, updatedAt: string): void {
-  sportQueue.remember(id, updatedAt);
-}
-
 export function rememberDay(date: string, updatedAt: string): void {
   dayQueue.remember(date, updatedAt);
 }
@@ -395,7 +354,6 @@ export function flushPendingSync(): void {
   goalQueue.flush();
   valueQueue.flush();
   focusQueue.flush();
-  sportQueue.flush();
   dayQueue.flush();
   pomodoroQueue.flush();
 }
@@ -405,7 +363,6 @@ export function dirtyRetain(): {
   goals: ReadonlySet<string>;
   values: ReadonlySet<string>;
   focuses: ReadonlySet<string>;
-  sportSessions: ReadonlySet<string>;
   dayStates: ReadonlySet<string>;
   pomodoroSessions: ReadonlySet<string>;
 } {
@@ -414,7 +371,6 @@ export function dirtyRetain(): {
     goals: goalQueue.dirtyIds(),
     values: valueQueue.dirtyIds(),
     focuses: focusQueue.dirtyIds(),
-    sportSessions: sportQueue.dirtyIds(),
     dayStates: dayQueue.dirtyIds(),
     pomodoroSessions: pomodoroQueue.dirtyIds(),
   };

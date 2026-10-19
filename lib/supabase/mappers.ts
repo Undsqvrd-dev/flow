@@ -7,7 +7,6 @@ import type {
   GoalScope,
   PomodoroSession,
   Settings,
-  SportSession,
   Task,
   Value,
 } from '@/lib/types';
@@ -34,6 +33,7 @@ export type TaskRow = {
   week_of: string;
   created_at: string;
   updated_at: string;
+  ritual_key?: string | null;
 };
 
 export type GoalRow = {
@@ -66,16 +66,6 @@ export type FocusRow = {
   day_focus_task_id: string | null;
   day_focus_note: string | null;
   day_focus_date: string | null;
-  updated_at: string;
-};
-
-export type SportRow = {
-  id: string;
-  date: string;
-  type: string;
-  duration_min: number;
-  intensity: number;
-  note: string | null;
   updated_at: string;
 };
 
@@ -127,11 +117,12 @@ export function taskFromRow(row: TaskRow): Task {
     weekOf: row.week_of,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    ritualKey: typeof row.ritual_key === 'string' && row.ritual_key.length > 0 ? row.ritual_key : null,
   };
 }
 
 export function taskToRow(task: Task): Omit<TaskRow, never> {
-  return {
+  const row: TaskRow = {
     id: task.id,
     title: task.title,
     description: task.description,
@@ -153,6 +144,8 @@ export function taskToRow(task: Task): Omit<TaskRow, never> {
     created_at: task.createdAt,
     updated_at: task.updatedAt,
   };
+  if (task.ritualKey) row.ritual_key = task.ritualKey;
+  return row;
 }
 
 export function goalFromRow(row: GoalRow): Goal {
@@ -220,30 +213,6 @@ export function focusToRow(focus: Focus) {
     day_focus_note: focus.dayFocusNote,
     day_focus_date: focus.dayFocusDate,
     updated_at: focus.updatedAt,
-  };
-}
-
-export function sportFromRow(row: SportRow): SportSession {
-  return {
-    id: row.id,
-    date: row.date,
-    type: row.type,
-    durationMin: row.duration_min,
-    intensity: row.intensity as SportSession['intensity'],
-    note: row.note,
-    updatedAt: row.updated_at,
-  };
-}
-
-export function sportToRow(session: SportSession) {
-  return {
-    id: session.id,
-    date: session.date,
-    type: session.type,
-    duration_min: session.durationMin,
-    intensity: session.intensity,
-    note: session.note,
-    updated_at: session.updatedAt,
   };
 }
 

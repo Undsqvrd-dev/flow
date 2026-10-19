@@ -18,7 +18,7 @@ export function ProgressBar({ value, className, trackClassName }: {
   );
 }
 
-/** Voortgangsring (SVG), gebruikt voor sportmeter, timer en doelvoortgang. */
+/** Voortgangsring (SVG), gebruikt voor timer en doelvoortgang. */
 export function ProgressRing({ value, size = 64, stroke = 6, className, children, color }: {
   value: number; // 0–100
   size?: number;

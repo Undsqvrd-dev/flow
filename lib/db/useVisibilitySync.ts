@@ -4,12 +4,12 @@ import { useEffect, useCallback, useRef } from 'react';
 import { loadAll } from './sync';
 import { syncEnabled } from './enabled';
 import { repairTaskChecklists } from '@/lib/checklist';
-import { dirtyRetain, flushPendingSync, persistChecklistRepairs, rememberDay, rememberFocus, rememberGoal, rememberPomodoro, rememberSport, rememberTask, rememberValue } from './liveSync';
+import { ensureTodayMeditation } from '@/lib/db/ensureMeditation';
+import { dirtyRetain, flushPendingSync, persistChecklistRepairs, rememberDay, rememberFocus, rememberGoal, rememberPomodoro, rememberTask, rememberValue } from './liveSync';
 import { mergeRemoteData, type MergeableStore } from './merge';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useGoalsStore } from '@/stores/useGoalsStore';
 import { useFocusStore } from '@/stores/useFocusStore';
-import { useSportStore } from '@/stores/useSportStore';
 import { usePomodoroStore } from '@/stores/usePomodoroStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { setQuickWinBundleCache } from './bundleCache';
@@ -37,7 +37,6 @@ export function useVisibilitySync(): void {
       const boardState = useBoardStore.getState();
       const goalsState = useGoalsStore.getState();
       const focusState = useFocusStore.getState();
-      const sportState = useSportStore.getState();
       const pomodoroState = usePomodoroStore.getState();
 
       const local: MergeableStore = {
@@ -45,7 +44,6 @@ export function useVisibilitySync(): void {
         goals: goalsState.goals,
         values: goalsState.values,
         focuses: focusState.focuses,
-        sportSessions: sportState.sessions,
         dayStates: boardState.dayStates,
         pomodoroSessions: pomodoroState.sessions,
       };
@@ -57,7 +55,6 @@ export function useVisibilitySync(): void {
           goals: remote.goals,
           values: remote.values,
           focuses: remote.focuses,
-          sportSessions: remote.sportSessions,
           dayStates: remote.dayStates,
           pomodoroSessions: remote.pomodoroSessions,
         },
@@ -78,7 +75,6 @@ export function useVisibilitySync(): void {
       });
 
       useFocusStore.setState({ focuses: merged.focuses });
-      useSportStore.setState({ sessions: merged.sportSessions });
       usePomodoroStore.setState({ sessions: merged.pomodoroSessions });
 
       const dirty = dirtyRetain();
@@ -94,9 +90,6 @@ export function useVisibilitySync(): void {
       for (const focus of merged.focuses) {
         if (!dirty.focuses.has(focus.id)) rememberFocus(focus.id, focus.updatedAt);
       }
-      for (const session of merged.sportSessions) {
-        if (!dirty.sportSessions.has(session.id)) rememberSport(session.id, session.updatedAt);
-      }
       for (const day of merged.dayStates) {
         if (!dirty.dayStates.has(day.date)) rememberDay(day.date, day.updatedAt);
       }
@@ -104,6 +97,7 @@ export function useVisibilitySync(): void {
         if (!dirty.pomodoroSessions.has(session.id)) rememberPomodoro(session.id, session.updatedAt);
       }
       persistChecklistRepairs();
+      await ensureTodayMeditation();
 
       useSettingsStore.setState({
         settings: { ...DEFAULT_SETTINGS, ...remote.settings },

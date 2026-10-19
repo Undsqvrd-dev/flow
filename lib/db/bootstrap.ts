@@ -12,7 +12,6 @@ import {
   upsertFocuses,
   upsertGoals,
   upsertPomodoroSessions,
-  upsertSportSessions,
   upsertTasks,
   upsertValues,
   type ReconcileResult,
@@ -21,13 +20,13 @@ import {
 import { timestampMs } from '@/lib/db/conflict';
 import { mergeRemoteData, itemsToPush, type MergeableStore } from '@/lib/db/merge';
 import { repairTaskChecklists } from '@/lib/checklist';
+import { ensureTodayMeditation } from '@/lib/db/ensureMeditation';
 import {
   persistChecklistRepairs,
   rememberDay,
   rememberFocus,
   rememberGoal,
   rememberPomodoro,
-  rememberSport,
   rememberTask,
   rememberValue,
 } from '@/lib/db/liveSync';
@@ -37,7 +36,6 @@ import { useFocusStore } from '@/stores/useFocusStore';
 import { useGoalsStore } from '@/stores/useGoalsStore';
 import { usePomodoroStore } from '@/stores/usePomodoroStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
-import { useSportStore } from '@/stores/useSportStore';
 import { DEFAULT_SETTINGS } from '@/lib/types';
 import type { Task } from '@/lib/types';
 
@@ -50,7 +48,6 @@ function hasLocalDomainData(): boolean {
   const board = useBoardStore.getState();
   const goals = useGoalsStore.getState();
   const focus = useFocusStore.getState();
-  const sport = useSportStore.getState();
   const pomo = usePomodoroStore.getState();
   return (
     board.tasks.length > 0 ||
@@ -58,7 +55,6 @@ function hasLocalDomainData(): boolean {
     goals.goals.length > 0 ||
     goals.values.length > 0 ||
     focus.focuses.length > 0 ||
-    sport.sessions.length > 0 ||
     pomo.sessions.length > 0
   );
 }
@@ -69,7 +65,6 @@ function snapshotLocal(): RemoteBundle {
     goals: useGoalsStore.getState().goals,
     values: useGoalsStore.getState().values,
     focuses: useFocusStore.getState().focuses,
-    sportSessions: useSportStore.getState().sessions,
     dayStates: useBoardStore.getState().dayStates,
     pomodoroSessions: usePomodoroStore.getState().sessions,
     settings: useSettingsStore.getState().settings,
@@ -80,8 +75,8 @@ function snapshotLocal(): RemoteBundle {
 /** Merge op id; bij conflict wint de nieuwste `updatedAt`. */
 export function mergeTasks(local: Task[], remote: Task[]): Task[] {
   const merged = mergeRemoteData(
-    { tasks: local, goals: [], values: [], focuses: [], sportSessions: [], dayStates: [], pomodoroSessions: [] },
-    { tasks: remote, goals: [], values: [], focuses: [], sportSessions: [], dayStates: [], pomodoroSessions: [] },
+    { tasks: local, goals: [], values: [], focuses: [], dayStates: [], pomodoroSessions: [] },
+    { tasks: remote, goals: [], values: [], focuses: [], dayStates: [], pomodoroSessions: [] },
   );
   return merged.tasks;
 }
@@ -98,7 +93,6 @@ function hydrate(remote: RemoteBundle): void {
     values: remote.values,
   });
   useFocusStore.setState({ focuses: remote.focuses });
-  useSportStore.setState({ sessions: remote.sportSessions });
   usePomodoroStore.setState({ sessions: remote.pomodoroSessions });
   useSettingsStore.setState({
     settings: { ...DEFAULT_SETTINGS, ...remote.settings },
@@ -111,7 +105,6 @@ async function waitForPersistHydration(): Promise<void> {
     useGoalsStore,
     useFocusStore,
     useSettingsStore,
-    useSportStore,
     usePomodoroStore,
   ] as const;
 
@@ -155,6 +148,7 @@ async function bootstrapOnce(): Promise<void> {
     markSyncReady(true);
     persistChecklistRepairs();
     subscribeToRealtime();
+    await ensureTodayMeditation();
     return;
   }
 
@@ -164,7 +158,6 @@ async function bootstrapOnce(): Promise<void> {
     goals: local.goals,
     values: local.values,
     focuses: local.focuses,
-    sportSessions: local.sportSessions,
     dayStates: local.dayStates,
     pomodoroSessions: local.pomodoroSessions,
   };
@@ -173,7 +166,6 @@ async function bootstrapOnce(): Promise<void> {
     goals: remote.goals,
     values: remote.values,
     focuses: remote.focuses,
-    sportSessions: remote.sportSessions,
     dayStates: remote.dayStates,
     pomodoroSessions: remote.pomodoroSessions,
   };
@@ -198,6 +190,7 @@ async function bootstrapOnce(): Promise<void> {
   persistChecklistRepairs();
 
   subscribeToRealtime();
+  await ensureTodayMeditation();
 }
 
 function rememberHydrated(data: MergeableStore): void {
@@ -205,7 +198,6 @@ function rememberHydrated(data: MergeableStore): void {
   for (const goal of data.goals) rememberGoal(goal.id, goal.updatedAt);
   for (const value of data.values) rememberValue(value.id, value.updatedAt);
   for (const focus of data.focuses) rememberFocus(focus.id, focus.updatedAt);
-  for (const session of data.sportSessions) rememberSport(session.id, session.updatedAt);
   for (const day of data.dayStates) rememberDay(day.date, day.updatedAt);
   for (const session of data.pomodoroSessions) rememberPomodoro(session.id, session.updatedAt);
 }
@@ -247,11 +239,6 @@ async function pushNewerThanServer(local: MergeableStore, remote: MergeableStore
     await upsertFocuses(itemsToPush(local.focuses, remote.focuses)),
     (focus) => focus.id,
   );
-  const sessions = applyWins(
-    useSportStore.getState().sessions,
-    await upsertSportSessions(itemsToPush(local.sportSessions, remote.sportSessions)),
-    (session) => session.id,
-  );
   const dayStates = applyWins(
     useBoardStore.getState().dayStates,
     await upsertDayStates(
@@ -272,14 +259,12 @@ async function pushNewerThanServer(local: MergeableStore, remote: MergeableStore
   useBoardStore.setState({ tasks, dayStates });
   useGoalsStore.setState({ goals, values });
   useFocusStore.setState({ focuses });
-  useSportStore.setState({ sessions });
   usePomodoroStore.setState({ sessions: pomodoro });
   rememberHydrated({
     tasks,
     goals,
     values,
     focuses,
-    sportSessions: sessions,
     dayStates,
     pomodoroSessions: pomodoro,
   });
@@ -319,7 +304,6 @@ export async function forcePushLocalToRemote(): Promise<{ taskCount: number }> {
     goals: remote.goals,
     values: remote.values,
     focuses: remote.focuses,
-    sportSessions: remote.sportSessions,
     dayStates: remote.dayStates,
     pomodoroSessions: remote.pomodoroSessions,
   });
@@ -332,5 +316,6 @@ export async function forcePushLocalToRemote(): Promise<{ taskCount: number }> {
   markSyncReady(true);
   persistChecklistRepairs();
   subscribeToRealtime();
+  await ensureTodayMeditation();
   return { taskCount: merged.tasks.length };
 }
