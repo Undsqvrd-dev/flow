@@ -5,12 +5,15 @@ import type {
   Goal,
   GoalHorizon,
   GoalScope,
+  LifeRule,
   PomodoroSession,
   Settings,
+  SportSession,
   Task,
   Value,
 } from '@/lib/types';
 import { DEFAULT_SETTINGS } from '@/lib/types';
+import { parseLabelBundles, type LabelBundle } from '@/lib/labelBundle';
 
 export type TaskRow = {
   id: string;
@@ -93,7 +96,10 @@ export type SettingsRow = {
   data: Record<string, unknown>;
 };
 
-export type SettingsPayload = Settings & { quickWinBundles?: string[] };
+export type SettingsPayload = Settings & {
+  quickWinBundles?: string[];
+  labelBundles?: LabelBundle[];
+};
 
 export function taskFromRow(row: TaskRow): Task {
   return {
@@ -190,6 +196,16 @@ export function valueToRow(value: Value) {
   return { id: value.id, text: value.text, rank: value.rank, updated_at: value.updatedAt };
 }
 
+export type LifeRuleRow = ValueRow;
+
+export function lifeRuleFromRow(row: LifeRuleRow): LifeRule {
+  return { id: row.id, text: row.text, rank: row.rank, updatedAt: row.updated_at };
+}
+
+export function lifeRuleToRow(rule: LifeRule) {
+  return { id: rule.id, text: rule.text, rank: rule.rank, updated_at: rule.updatedAt };
+}
+
 export function focusFromRow(row: FocusRow): Focus {
   return {
     id: row.id,
@@ -249,6 +265,40 @@ export function pomodoroFromRow(row: PomodoroRow): PomodoroSession {
   };
 }
 
+export type SportRow = {
+  id: string;
+  date: string;
+  type: string;
+  duration_min: number;
+  intensity: number;
+  note: string | null;
+  updated_at: string;
+};
+
+export function sportFromRow(row: SportRow): SportSession {
+  return {
+    id: row.id,
+    date: row.date,
+    type: row.type,
+    durationMin: row.duration_min,
+    intensity: row.intensity as SportSession['intensity'],
+    note: row.note,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function sportToRow(session: SportSession) {
+  return {
+    id: session.id,
+    date: session.date,
+    type: session.type,
+    duration_min: session.durationMin,
+    intensity: session.intensity,
+    note: session.note,
+    updated_at: session.updatedAt,
+  };
+}
+
 export function pomodoroToRow(session: PomodoroSession) {
   return {
     id: session.id,
@@ -265,15 +315,21 @@ export function pomodoroToRow(session: PomodoroSession) {
 export function settingsFromRow(data: Record<string, unknown> | null): {
   settings: Settings;
   quickWinBundles: string[];
+  labelBundles: LabelBundle[];
 } {
   const raw = (data ?? {}) as Partial<SettingsPayload>;
-  const { quickWinBundles, ...rest } = raw;
+  const { quickWinBundles, labelBundles, ...rest } = raw;
   return {
     settings: { ...DEFAULT_SETTINGS, ...rest },
     quickWinBundles: Array.isArray(quickWinBundles) ? quickWinBundles : [],
+    labelBundles: parseLabelBundles(labelBundles),
   };
 }
 
-export function settingsToData(settings: Settings, quickWinBundles: string[]): SettingsPayload {
-  return { ...settings, quickWinBundles };
+export function settingsToData(
+  settings: Settings,
+  quickWinBundles: string[],
+  labelBundles: LabelBundle[] = [],
+): SettingsPayload {
+  return { ...settings, quickWinBundles, labelBundles };
 }

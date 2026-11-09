@@ -13,9 +13,11 @@ import {
 } from '@/lib/dates';
 import { nextRank, prevRank, rankBetween, RANK_STEP, uid } from '@/lib/utils';
 import { QUADRANT_ORDER, quadrant } from '@/lib/priority';
-import { setQuickWinBundleCache } from '@/lib/db/bundleCache';
+import { setLabelBundleCache, setQuickWinBundleCache } from '@/lib/db/bundleCache';
+import { detachTask, parseLabelBundles, sameLabelBundles, type LabelBundle } from '@/lib/labelBundle';
 import { repairChecklist } from '@/lib/checklist';
 import { compareDayTasks, isClosingRitual } from '@/lib/closing';
+import { reconcileSportSessions } from '@/stores/useSportStore';
 import { UNKNOWN_UPDATED_AT } from '@/lib/db/conflict';
 import {
   syncDayStates,
@@ -40,6 +42,8 @@ export interface NewTaskInput {
   estimateMin?: number | null;
   labels?: string[];
   dueDate?: string | null;
+  ritualKey?: string | null;
+  rank?: number;
   /** 'start' = bovenaan de sectie. Default: onderaan. */
   position?: 'start' | 'end';
   /** Voeg in vóór deze taak (heeft voorrang op position). */
@@ -51,6 +55,8 @@ interface BoardState {
   dayStates: DayState[];
   /** Bundelsleutels `weekOf:dayKey` — korte taken van die dag zitten in QuickWin's. */
   quickWinBundles: string[];
+  /** Kaarten die via hetzelfde label aan elkaar hangen. */
+  labelBundles: LabelBundle[];
   /** Oorspronkelijke volgorde per kolom vóór sorteren (`weekOf:dayKey`). */
   sortSnapshots: Record<string, SortSnapshotEntry[]>;
 
@@ -89,6 +95,7 @@ interface BoardState {
 
   enableQuickWinBundle: (dayKey: DayKey, columnWeekOf?: string) => void;
   disableQuickWinBundle: (dayKey: DayKey, columnWeekOf?: string) => void;
+  setLabelBundles: (bundles: LabelBundle[]) => void;
 
   /** Weekrollover: sticky borddagen + dump/wachtruimte blijven; overige → algemeen. */
   rollover: () => void;
@@ -162,7 +169,7 @@ function makeTask(input: NewTaskInput, siblings: Task[]): Task {
     description: input.description ?? null,
     dayKey,
     daypart: input.daypart ?? null,
-    rank: resolveRank(input, siblings),
+    rank: input.rank ?? resolveRank(input, siblings),
     goalId: input.goalId ?? null,
     urgent: null,
     important: null,
@@ -176,6 +183,7 @@ function makeTask(input: NewTaskInput, siblings: Task[]): Task {
     weekOf: input.weekOf ?? weekOf(),
     createdAt: now,
     updatedAt: now,
+    ritualKey: input.ritualKey ?? null,
   };
 }
 
@@ -187,6 +195,7 @@ export const useBoardStore = create<BoardState>()(
       tasks: [],
       dayStates: [],
       quickWinBundles: [],
+      labelBundles: [],
       sortSnapshots: {},
 
       addTask: (input) => {
@@ -213,8 +222,21 @@ export const useBoardStore = create<BoardState>()(
 
       removeTask: (id) => {
         const prev = get().tasks;
-        set({ tasks: prev.filter((t) => t.id !== id) });
-        syncRemoveTask(id, () => set({ tasks: prev }));
+        const prevBundles = get().labelBundles;
+        const member = prevBundles.some((bundle) => bundle.taskIds.includes(id));
+        const nextBundles = member ? detachTask(prevBundles, id) : prevBundles;
+        set({ tasks: prev.filter((t) => t.id !== id), labelBundles: nextBundles });
+        if (member) setLabelBundleCache(nextBundles);
+        syncRemoveTask(id, () => {
+          set({ tasks: prev, labelBundles: prevBundles });
+          if (member) setLabelBundleCache(prevBundles);
+        });
+        if (member) {
+          syncSettingsData(useSettingsStore.getState().settings, get().quickWinBundles, () => {
+            set({ labelBundles: prevBundles });
+            setLabelBundleCache(prevBundles);
+          }, nextBundles);
+        }
       },
 
       duplicateTask: (id) => {
@@ -253,6 +275,7 @@ export const useBoardStore = create<BoardState>()(
         set({ tasks: next });
         const updated = next.find((t) => t.id === id);
         if (updated) syncTasks([updated], prev, () => set({ tasks: prev }));
+        reconcileSportSessions(next);
       },
 
       moveTask: (id, dayKey, daypart, index, targetWeekOf) => {
@@ -564,6 +587,17 @@ export const useBoardStore = create<BoardState>()(
         });
       },
 
+      setLabelBundles: (bundles) => {
+        const prev = get().labelBundles;
+        if (prev === bundles || sameLabelBundles(prev, bundles)) return;
+        set({ labelBundles: bundles });
+        setLabelBundleCache(bundles);
+        syncSettingsData(useSettingsStore.getState().settings, get().quickWinBundles, () => {
+          set({ labelBundles: prev });
+          setLabelBundleCache(prev);
+        }, bundles);
+      },
+
       disableQuickWinBundle: (dayKey, columnWeekOf) => {
         const key = quickWinBundleKey(dayKey, columnWeekOf ?? weekOf());
         const prev = get().quickWinBundles;
@@ -608,6 +642,7 @@ export const useBoardStore = create<BoardState>()(
           tasks?: Task[];
           dayStates?: DayState[];
           quickWinBundles?: string[];
+          labelBundles?: unknown;
           sortSnapshots?: Record<string, SortSnapshotEntry[]>;
         };
         return {
@@ -617,6 +652,7 @@ export const useBoardStore = create<BoardState>()(
             updatedAt: d.updatedAt ?? UNKNOWN_UPDATED_AT,
           })),
           quickWinBundles: migrateBundles(p.quickWinBundles ?? []),
+          labelBundles: parseLabelBundles(p.labelBundles),
           sortSnapshots: p.sortSnapshots ?? {},
         };
       },
@@ -632,6 +668,7 @@ export const useBoardStore = create<BoardState>()(
             updatedAt: d.updatedAt ?? UNKNOWN_UPDATED_AT,
           })),
           quickWinBundles: migrateBundles(p.quickWinBundles ?? []),
+          labelBundles: parseLabelBundles(p.labelBundles),
           sortSnapshots: p.sortSnapshots ?? {},
         };
       },
@@ -639,11 +676,26 @@ export const useBoardStore = create<BoardState>()(
         tasks: state.tasks,
         dayStates: state.dayStates,
         quickWinBundles: state.quickWinBundles,
+        labelBundles: state.labelBundles,
         sortSnapshots: state.sortSnapshots,
       }),
     },
   ),
 );
+
+function publishBundleCache(): void {
+  const state = useBoardStore.getState();
+  setQuickWinBundleCache(state.quickWinBundles ?? []);
+  setLabelBundleCache(state.labelBundles ?? []);
+}
+
+const boardPersist = useBoardStore.persist;
+if (boardPersist) {
+  if (boardPersist.hasHydrated()) publishBundleCache();
+  boardPersist.onFinishHydration(publishBundleCache);
+} else {
+  publishBundleCache();
+}
 
 /* ——— selectors (pure functies, geen hooks) ——— */
 

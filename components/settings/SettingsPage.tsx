@@ -278,6 +278,10 @@ export function SettingsPage() {
           />
         </Panel>
 
+        <Panel title="Sport">
+          <NumberField label="Weekdoel (sessies)" value={settings.sportWeeklyTarget} onChange={(v) => update({ sportWeeklyTarget: v })} />
+        </Panel>
+
         <Panel title="Labels">
           <LabelsEditor />
         </Panel>

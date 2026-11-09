@@ -5,9 +5,9 @@ import { Plus, Columns3 } from 'lucide-react';
 import { StatRow } from './StatRow';
 import { WeekTargetCard } from './WeekTargetCard';
 import { YearGoalCard } from './YearGoalCard';
-import { TimerCard } from './TimerCard';
 import { MoodQuoteRow } from './MoodQuoteRow';
 import { MeditationStreakCard } from './MeditationStreakCard';
+import { SportStreakCard } from './SportStreakCard';
 import { Button } from '@/components/ui/button';
 import { useUiStore } from '@/stores/useUiStore';
 
@@ -33,15 +33,15 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <StatRow />
-        <TimerCard />
+        <MeditationStreakCard compact />
+        <SportStreakCard />
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <WeekTargetCard />
         <YearGoalCard />
-        <MeditationStreakCard />
       </div>
 
       <div className="mt-4">

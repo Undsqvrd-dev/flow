@@ -13,6 +13,8 @@ export function AddTaskInline({
   weekOf: columnWeekOf,
   position = 'end',
   insertBeforeId,
+  labels,
+  bundleId,
   autoEdit = false,
   onClose,
 }: {
@@ -21,10 +23,14 @@ export function AddTaskInline({
   weekOf?: string;
   position?: 'start' | 'end';
   insertBeforeId?: string;
+  /** Label van de bundel waarin deze kaart wordt toegevoegd. */
+  labels?: string[];
+  bundleId?: string;
   autoEdit?: boolean;
   onClose?: () => void;
 }) {
   const addTask = useBoardStore((s) => s.addTask);
+  const setLabelBundles = useBoardStore((s) => s.setLabelBundles);
   const [editing, setEditing] = useState(autoEdit);
   const [title, setTitle] = useState('');
 
@@ -37,13 +43,24 @@ export function AddTaskInline({
   function submit() {
     const trimmed = title.trim();
     if (trimmed) {
-      addTask({
+      const task = addTask({
         title: trimmed,
         dayKey,
         daypart,
         weekOf: columnWeekOf,
+        ...(labels ? { labels } : {}),
         ...(insertBeforeId ? { insertBeforeId } : { position }),
       });
+      if (bundleId) {
+        const current = useBoardStore.getState().labelBundles;
+        setLabelBundles(
+          current.map((bundle) =>
+            bundle.id === bundleId && !bundle.taskIds.includes(task.id)
+              ? { ...bundle, taskIds: [...bundle.taskIds, task.id] }
+              : bundle,
+          ),
+        );
+      }
     }
     close();
   }

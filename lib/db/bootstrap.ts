@@ -2,7 +2,7 @@
 
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import { createClient } from '@/lib/supabase/client';
-import { setQuickWinBundleCache } from '@/lib/db/bundleCache';
+import { setLabelBundleCache, setQuickWinBundleCache } from '@/lib/db/bundleCache';
 import { markSyncReady } from '@/lib/db/enabled';
 import {
   isRemoteEmpty,
@@ -12,7 +12,9 @@ import {
   upsertFocuses,
   upsertGoals,
   upsertPomodoroSessions,
+  upsertSportSessions,
   upsertTasks,
+  upsertLifeRules,
   upsertValues,
   type ReconcileResult,
   type RemoteBundle,
@@ -21,13 +23,16 @@ import { timestampMs } from '@/lib/db/conflict';
 import { mergeRemoteData, itemsToPush, type MergeableStore } from '@/lib/db/merge';
 import { repairTaskChecklists } from '@/lib/checklist';
 import { ensureTodayRituals } from '@/lib/db/ensureMeditation';
+import { seedPersonalDirectionIfEmpty } from '@/lib/personalDirection';
 import {
   persistChecklistRepairs,
   rememberDay,
   rememberFocus,
   rememberGoal,
   rememberPomodoro,
+  rememberSport,
   rememberTask,
+  rememberLifeRule,
   rememberValue,
 } from '@/lib/db/liveSync';
 import { subscribeToRealtime } from '@/lib/db/realtime';
@@ -35,6 +40,7 @@ import { useBoardStore } from '@/stores/useBoardStore';
 import { useFocusStore } from '@/stores/useFocusStore';
 import { useGoalsStore } from '@/stores/useGoalsStore';
 import { usePomodoroStore } from '@/stores/usePomodoroStore';
+import { useSportStore } from '@/stores/useSportStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { DEFAULT_SETTINGS } from '@/lib/types';
 import type { Task } from '@/lib/types';
@@ -49,13 +55,15 @@ function hasLocalDomainData(): boolean {
   const goals = useGoalsStore.getState();
   const focus = useFocusStore.getState();
   const pomo = usePomodoroStore.getState();
+  const sport = useSportStore.getState();
   return (
     board.tasks.length > 0 ||
     board.dayStates.length > 0 ||
     goals.goals.length > 0 ||
     goals.values.length > 0 ||
     focus.focuses.length > 0 ||
-    pomo.sessions.length > 0
+    pomo.sessions.length > 0 ||
+    sport.sessions.length > 0
   );
 }
 
@@ -64,19 +72,22 @@ function snapshotLocal(): RemoteBundle {
     tasks: useBoardStore.getState().tasks,
     goals: useGoalsStore.getState().goals,
     values: useGoalsStore.getState().values,
+    lifeRules: useGoalsStore.getState().lifeRules ?? [],
     focuses: useFocusStore.getState().focuses,
     dayStates: useBoardStore.getState().dayStates,
     pomodoroSessions: usePomodoroStore.getState().sessions,
+    sportSessions: useSportStore.getState().sessions,
     settings: useSettingsStore.getState().settings,
     quickWinBundles: useBoardStore.getState().quickWinBundles,
+    labelBundles: useBoardStore.getState().labelBundles ?? [],
   };
 }
 
 /** Merge op id; bij conflict wint de nieuwste `updatedAt`. */
 export function mergeTasks(local: Task[], remote: Task[]): Task[] {
   const merged = mergeRemoteData(
-    { tasks: local, goals: [], values: [], focuses: [], dayStates: [], pomodoroSessions: [] },
-    { tasks: remote, goals: [], values: [], focuses: [], dayStates: [], pomodoroSessions: [] },
+    { tasks: local, goals: [], values: [], lifeRules: [], focuses: [], dayStates: [], pomodoroSessions: [], sportSessions: [] },
+    { tasks: remote, goals: [], values: [], lifeRules: [], focuses: [], dayStates: [], pomodoroSessions: [], sportSessions: [] },
   );
   return merged.tasks;
 }
@@ -86,14 +97,18 @@ function hydrate(remote: RemoteBundle): void {
     tasks: repairTaskChecklists(remote.tasks).tasks,
     dayStates: remote.dayStates,
     quickWinBundles: remote.quickWinBundles,
+    labelBundles: remote.labelBundles,
   });
   setQuickWinBundleCache(remote.quickWinBundles);
+  setLabelBundleCache(remote.labelBundles);
   useGoalsStore.setState({
     goals: remote.goals,
     values: remote.values,
+    lifeRules: remote.lifeRules,
   });
   useFocusStore.setState({ focuses: remote.focuses });
   usePomodoroStore.setState({ sessions: remote.pomodoroSessions });
+  useSportStore.setState({ sessions: remote.sportSessions });
   useSettingsStore.setState({
     settings: { ...DEFAULT_SETTINGS, ...remote.settings },
   });
@@ -106,6 +121,7 @@ async function waitForPersistHydration(): Promise<void> {
     useFocusStore,
     useSettingsStore,
     usePomodoroStore,
+    useSportStore,
   ] as const;
 
   await Promise.all(
@@ -126,13 +142,21 @@ async function waitForPersistHydration(): Promise<void> {
 }
 
 async function bootstrapOnce(): Promise<void> {
-  if (!getSupabaseEnv()) return;
+  if (!getSupabaseEnv()) {
+    await waitForPersistHydration();
+    seedPersonalDirectionIfEmpty();
+    return;
+  }
 
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) {
+    await waitForPersistHydration();
+    seedPersonalDirectionIfEmpty();
+    return;
+  }
 
   await waitForPersistHydration();
 
@@ -143,12 +167,14 @@ async function bootstrapOnce(): Promise<void> {
   // Eerste keer: lege remote ← lokale data pushen.
   if (isRemoteEmpty(remote) && hasLocalDomainData() && !migrated) {
     setQuickWinBundleCache(local.quickWinBundles);
+    setLabelBundleCache(local.labelBundles);
     await pushAll(local);
     localStorage.setItem(MIGRATED_KEY, '1');
     markSyncReady(true);
     persistChecklistRepairs();
     subscribeToRealtime();
     await ensureTodayRituals();
+    seedPersonalDirectionIfEmpty();
     return;
   }
 
@@ -157,17 +183,21 @@ async function bootstrapOnce(): Promise<void> {
     tasks: local.tasks,
     goals: local.goals,
     values: local.values,
+    lifeRules: local.lifeRules,
     focuses: local.focuses,
     dayStates: local.dayStates,
     pomodoroSessions: local.pomodoroSessions,
+    sportSessions: local.sportSessions,
   };
   const remoteStore: MergeableStore = {
     tasks: remote.tasks,
     goals: remote.goals,
     values: remote.values,
+    lifeRules: remote.lifeRules,
     focuses: remote.focuses,
     dayStates: remote.dayStates,
     pomodoroSessions: remote.pomodoroSessions,
+    sportSessions: remote.sportSessions,
   };
 
   const mergedStore = mergeRemoteData(localStore, remoteStore);
@@ -178,6 +208,7 @@ async function bootstrapOnce(): Promise<void> {
     quickWinBundles: remote.quickWinBundles.length
       ? remote.quickWinBundles
       : local.quickWinBundles,
+    labelBundles: remote.labelBundles.length ? remote.labelBundles : local.labelBundles,
   };
 
   hydrate(merged);
@@ -191,15 +222,18 @@ async function bootstrapOnce(): Promise<void> {
 
   subscribeToRealtime();
   await ensureTodayRituals();
+  seedPersonalDirectionIfEmpty();
 }
 
 function rememberHydrated(data: MergeableStore): void {
   for (const task of data.tasks) rememberTask(task.id, task.updatedAt);
   for (const goal of data.goals) rememberGoal(goal.id, goal.updatedAt);
   for (const value of data.values) rememberValue(value.id, value.updatedAt);
+  for (const rule of data.lifeRules) rememberLifeRule(rule.id, rule.updatedAt);
   for (const focus of data.focuses) rememberFocus(focus.id, focus.updatedAt);
   for (const day of data.dayStates) rememberDay(day.date, day.updatedAt);
   for (const session of data.pomodoroSessions) rememberPomodoro(session.id, session.updatedAt);
+  for (const session of data.sportSessions) rememberSport(session.id, session.updatedAt);
 }
 
 function applyWins<T>(
@@ -234,6 +268,11 @@ async function pushNewerThanServer(local: MergeableStore, remote: MergeableStore
     await upsertValues(itemsToPush(local.values, remote.values)),
     (value) => value.id,
   );
+  const lifeRules = applyWins(
+    useGoalsStore.getState().lifeRules ?? [],
+    await upsertLifeRules(itemsToPush(local.lifeRules, remote.lifeRules)),
+    (rule) => rule.id,
+  );
   const focuses = applyWins(
     useFocusStore.getState().focuses,
     await upsertFocuses(itemsToPush(local.focuses, remote.focuses)),
@@ -255,18 +294,26 @@ async function pushNewerThanServer(local: MergeableStore, remote: MergeableStore
     await upsertPomodoroSessions(itemsToPush(local.pomodoroSessions, remote.pomodoroSessions)),
     (session) => session.id,
   );
+  const sport = applyWins(
+    useSportStore.getState().sessions,
+    await upsertSportSessions(itemsToPush(local.sportSessions, remote.sportSessions)),
+    (session) => session.id,
+  );
 
   useBoardStore.setState({ tasks, dayStates });
-  useGoalsStore.setState({ goals, values });
+  useGoalsStore.setState({ goals, values, lifeRules });
   useFocusStore.setState({ focuses });
   usePomodoroStore.setState({ sessions: pomodoro });
+  useSportStore.setState({ sessions: sport });
   rememberHydrated({
     tasks,
     goals,
     values,
+    lifeRules,
     focuses,
     dayStates,
     pomodoroSessions: pomodoro,
+    sportSessions: sport,
   });
 }
 
@@ -303,19 +350,23 @@ export async function forcePushLocalToRemote(): Promise<{ taskCount: number }> {
     tasks: remote.tasks,
     goals: remote.goals,
     values: remote.values,
+    lifeRules: remote.lifeRules,
     focuses: remote.focuses,
     dayStates: remote.dayStates,
     pomodoroSessions: remote.pomodoroSessions,
+    sportSessions: remote.sportSessions,
   });
   hydrate({
     ...merged,
     settings: remote.settings,
     quickWinBundles: remote.quickWinBundles,
+    labelBundles: remote.labelBundles.length ? remote.labelBundles : local.labelBundles,
   });
   rememberHydrated(merged);
   markSyncReady(true);
   persistChecklistRepairs();
   subscribeToRealtime();
   await ensureTodayRituals();
+  seedPersonalDirectionIfEmpty();
   return { taskCount: merged.tasks.length };
 }

@@ -16,7 +16,11 @@ import {
   dayStateToRow,
   focusToRow,
   goalToRow,
+  lifeRuleFromRow,
+  lifeRuleToRow,
   pomodoroToRow,
+  sportFromRow,
+  sportToRow,
   taskFromRow,
   taskToRow,
   goalFromRow,
@@ -28,11 +32,13 @@ import {
   type DayStateRow,
   type FocusRow,
   type GoalRow,
+  type LifeRuleRow,
   type PomodoroRow,
+  type SportRow,
   type TaskRow,
   type ValueRow,
 } from '@/lib/supabase/mappers';
-import type { DayState, Focus, Goal, PomodoroSession, Task, Value } from '@/lib/types';
+import type { DayState, Focus, Goal, LifeRule, PomodoroSession, SportSession, Task, Value } from '@/lib/types';
 
 function asRow(value: object): Record<string, unknown> {
   return { ...(value as Record<string, unknown>) };
@@ -149,6 +155,33 @@ const valueQueue = bindQueue<Value>({
     }),
 });
 
+const lifeRuleQueue = bindQueue<LifeRule>({
+  getId: (rule) => rule.id,
+  getList: async () => (await import('@/stores/useGoalsStore')).useGoalsStore.getState().lifeRules ?? [],
+  setList: async (lifeRules) => {
+    (await import('@/stores/useGoalsStore')).useGoalsStore.setState({ lifeRules });
+  },
+  write: async (rule, baseUpdatedAt) => {
+    try {
+      return await writeVersioned({
+        table: 'flow_life_rules',
+        key: 'id',
+        id: rule.id,
+        row: asRow(lifeRuleToRow(rule)),
+        baseUpdatedAt,
+        ifMissing: 'remove',
+        parse: (row) => lifeRuleFromRow(row as unknown as LifeRuleRow),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (/flow_life_rules/.test(message) && /schema cache|does not exist/i.test(message)) {
+        return { status: 'ok' as const, server: rule };
+      }
+      throw error;
+    }
+  },
+});
+
 const focusQueue = bindQueue<Focus>({
   getId: (focus) => focus.id,
   getList: async () => (await import('@/stores/useFocusStore')).useFocusStore.getState().focuses,
@@ -200,6 +233,24 @@ const pomodoroQueue = bindQueue<PomodoroSession>({
       baseUpdatedAt,
       ifMissing: 'remove',
       parse: (row) => pomodoroFromRow(row as unknown as PomodoroRow),
+    }),
+});
+
+const sportQueue = bindQueue<SportSession>({
+  getId: (session) => session.id,
+  getList: async () => (await import('@/stores/useSportStore')).useSportStore.getState().sessions,
+  setList: async (sessions) => {
+    (await import('@/stores/useSportStore')).useSportStore.setState({ sessions });
+  },
+  write: (session, baseUpdatedAt) =>
+    writeVersioned({
+      table: 'sport_sessions',
+      key: 'id',
+      id: session.id,
+      row: asRow(sportToRow(session)),
+      baseUpdatedAt,
+      ifMissing: 'remove',
+      parse: (row) => sportFromRow(row as unknown as SportRow),
     }),
 });
 
@@ -265,6 +316,14 @@ export function enqueueValues(values: readonly Value[], previous: readonly Value
   enqueue(valueQueue, values, previous, (value) => value.id, rollback);
 }
 
+export function enqueueLifeRules(
+  rules: readonly LifeRule[],
+  previous: readonly LifeRule[],
+  rollback: () => void,
+): void {
+  enqueue(lifeRuleQueue, rules, previous, (rule) => rule.id, rollback);
+}
+
 export function enqueueFocuses(
   focuses: readonly Focus[],
   previous: readonly Focus[],
@@ -289,6 +348,18 @@ export function enqueuePomodoro(
   enqueue(pomodoroQueue, sessions, previous, (session) => session.id, rollback);
 }
 
+export function enqueueSport(
+  sessions: readonly SportSession[],
+  previous: readonly SportSession[],
+  rollback: () => void,
+): void {
+  enqueue(sportQueue, sessions, previous, (session) => session.id, rollback);
+}
+
+export function forgetSport(id: string): void {
+  sportQueue.forget(id);
+}
+
 export function forgetTask(id: string): void {
   taskQueue.forget(id);
 }
@@ -299,6 +370,10 @@ export function forgetGoal(id: string): void {
 
 export function forgetValue(id: string): void {
   valueQueue.forget(id);
+}
+
+export function forgetLifeRule(id: string): void {
+  lifeRuleQueue.forget(id);
 }
 
 export function taskDirtyIds(): ReadonlySet<string> {
@@ -325,6 +400,10 @@ export function pomodoroDirtyIds(): ReadonlySet<string> {
   return pomodoroQueue.dirtyIds();
 }
 
+export function sportDirtyIds(): ReadonlySet<string> {
+  return sportQueue.dirtyIds();
+}
+
 export function rememberTask(id: string, updatedAt: string): void {
   taskQueue.remember(id, updatedAt);
 }
@@ -335,6 +414,10 @@ export function rememberGoal(id: string, updatedAt: string): void {
 
 export function rememberValue(id: string, updatedAt: string): void {
   valueQueue.remember(id, updatedAt);
+}
+
+export function rememberLifeRule(id: string, updatedAt: string): void {
+  lifeRuleQueue.remember(id, updatedAt);
 }
 
 export function rememberFocus(id: string, updatedAt: string): void {
@@ -349,29 +432,39 @@ export function rememberPomodoro(id: string, updatedAt: string): void {
   pomodoroQueue.remember(id, updatedAt);
 }
 
+export function rememberSport(id: string, updatedAt: string): void {
+  sportQueue.remember(id, updatedAt);
+}
+
 export function flushPendingSync(): void {
   taskQueue.flush();
   goalQueue.flush();
   valueQueue.flush();
+  lifeRuleQueue.flush();
   focusQueue.flush();
   dayQueue.flush();
   pomodoroQueue.flush();
+  sportQueue.flush();
 }
 
 export function dirtyRetain(): {
   tasks: ReadonlySet<string>;
   goals: ReadonlySet<string>;
   values: ReadonlySet<string>;
+  lifeRules: ReadonlySet<string>;
   focuses: ReadonlySet<string>;
   dayStates: ReadonlySet<string>;
   pomodoroSessions: ReadonlySet<string>;
+  sportSessions: ReadonlySet<string>;
 } {
   return {
     tasks: taskQueue.dirtyIds(),
     goals: goalQueue.dirtyIds(),
     values: valueQueue.dirtyIds(),
+    lifeRules: lifeRuleQueue.dirtyIds(),
     focuses: focusQueue.dirtyIds(),
     dayStates: dayQueue.dirtyIds(),
     pomodoroSessions: pomodoroQueue.dirtyIds(),
+    sportSessions: sportQueue.dirtyIds(),
   };
 }

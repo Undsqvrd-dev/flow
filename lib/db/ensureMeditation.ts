@@ -1,6 +1,20 @@
 'use client';
 
-import { todayISO } from '@/lib/dates';
+import { parseISO } from 'date-fns';
+import { dayKeyFromDate, todayISO, weekOf } from '@/lib/dates';
+import {
+  findPersonalLabel,
+  PERSONAL_LABEL_COLOR,
+  PERSONAL_LABEL_NAME,
+  ritualBundleId,
+  withRitualPair,
+} from '@/lib/labelBundle';
+import { MEDITATION_TITLE, meditationRitualKey } from '@/lib/meditation';
+import { SPORT_RITUAL_RANK, SPORT_TITLE, sportRitualKey } from '@/lib/sportRitual';
+import { setLabelBundleCache } from '@/lib/db/bundleCache';
+import { uid } from '@/lib/utils';
+import { useSettingsStore } from '@/stores/useSettingsStore';
+import { reconcileSportSessions } from '@/stores/useSportStore';
 import { applyUpsert } from '@/lib/db/applyRemote';
 import { syncEnabled } from '@/lib/db/enabled';
 import { rememberTask, taskDirtyIds } from '@/lib/db/liveSync';
@@ -51,23 +65,92 @@ function applyRitualRow(row: Record<string, unknown>): void {
  * Bestaat de nieuwe RPC nog niet, dan blijft Mediteren via migratie 006 werken.
  */
 export async function ensureTodayRituals(date = todayISO()): Promise<void> {
-  if (!syncEnabled()) return;
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc('ensure_daily_rituals', { p_date: date });
-  if (error) {
-    if (!warnedRituals) {
-      warnedRituals = true;
-      console.error(
-        '[flow rituelen] ensure_daily_rituals mislukt. Draai migratie 007 op de database. Mediteren blijft via 006.',
-        error,
-      );
+  try {
+    if (!syncEnabled()) return;
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc('ensure_daily_rituals', { p_date: date });
+    if (error) {
+      if (!warnedRituals) {
+        warnedRituals = true;
+        console.error(
+          '[flow rituelen] ensure_daily_rituals mislukt. Draai migratie 007 op de database. Mediteren blijft via 006.',
+          error,
+        );
+      }
+      await ensureTodayMeditation(date);
+      return;
     }
-    await ensureTodayMeditation(date);
-    return;
-  }
 
-  const rows = Array.isArray(data) ? data : [];
-  for (const row of rows) {
-    if (isRecord(row)) applyRitualRow(row);
+    const rows = Array.isArray(data) ? data : [];
+    for (const row of rows) {
+      if (isRecord(row)) applyRitualRow(row);
+    }
+  } finally {
+    ensureLocalSportTask(date);
+    ensureSportMeditationBundle(date);
+    reconcileSportSessions(useBoardStore.getState().tasks);
   }
+}
+
+function ritualTask(date: string, key: string, title: string) {
+  const day = parseISO(date);
+  const dayKey = dayKeyFromDate(day);
+  const week = weekOf(day);
+  return useBoardStore.getState().tasks.find(
+    (task) => task.ritualKey === key || (task.title === title && task.dayKey === dayKey && task.weekOf === week),
+  );
+}
+
+/** Sport krijgt Persoonlijk en start in één groep met Mediteren. Een splitsing blijft staan. */
+function ensureSportMeditationBundle(date: string): void {
+  if (useBoardStore.getState().labelBundles.some((bundle) => bundle.id === ritualBundleId(date))) return;
+  const meditation = ritualTask(date, meditationRitualKey(date), MEDITATION_TITLE);
+  const sport = ritualTask(date, sportRitualKey(date), SPORT_TITLE);
+  if (!meditation || !sport) return;
+
+  let label = findPersonalLabel(useSettingsStore.getState().settings.labels ?? []);
+  const labelId = label?.id ?? uid();
+  if (!label) {
+    const prev = useSettingsStore.getState().settings;
+    useSettingsStore.setState({
+      settings: {
+        ...prev,
+        labels: [...prev.labels, { id: labelId, name: PERSONAL_LABEL_NAME, color: PERSONAL_LABEL_COLOR }],
+      },
+    });
+    label = findPersonalLabel(useSettingsStore.getState().settings.labels ?? []);
+  }
+  if (!label) return;
+
+  const bundles = useBoardStore.getState().labelBundles;
+  const seeded = withRitualPair(bundles, date, label.id, meditation.id, sport.id);
+  if (seeded === bundles) return;
+  setLabelBundleCache(seeded);
+  for (const task of [meditation, sport]) {
+    if (!task.labels.includes(label.id)) {
+      useBoardStore.getState().updateTask(task.id, { labels: [...task.labels, label.id] });
+    }
+  }
+  useBoardStore.getState().setLabelBundles(seeded);
+}
+
+/** Zorgt lokaal voor de ochtendtaak, ook als migratie 009 nog niet draait. */
+function ensureLocalSportTask(date: string): void {
+  const key = sportRitualKey(date);
+  const day = parseISO(date);
+  const dayKey = dayKeyFromDate(day);
+  const week = weekOf(day);
+  const tasks = useBoardStore.getState().tasks;
+  const exists = tasks.some(
+    (task) => task.ritualKey === key || (task.title === SPORT_TITLE && task.dayKey === dayKey && task.weekOf === week),
+  );
+  if (exists) return;
+  useBoardStore.getState().addTask({
+    title: SPORT_TITLE,
+    dayKey,
+    daypart: 'ochtend',
+    weekOf: week,
+    rank: SPORT_RITUAL_RANK,
+    ritualKey: key,
+  });
 }

@@ -6,66 +6,21 @@ import {
   type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core';
 import { parseISO } from 'date-fns';
-import type { DayKey, Daypart, Task } from '@/lib/types';
+import type { DayKey } from '@/lib/types';
 import { Column } from './Column';
 import { TaskCard } from './TaskCard';
 import { WeekTray } from './WeekTray';
 import { QuickWinsCard } from './QuickWinsCard';
-import { parseSectionId } from './PartSection';
 import { FocusBar } from '@/components/focusbar/FocusBar';
-import {
-  useBoardStore,
-  openTasksFor,
-  openTasksForDay,
-  quickWinsForDay,
-} from '@/stores/useBoardStore';
+import { useBoardStore } from '@/stores/useBoardStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useUiStore } from '@/stores/useUiStore';
-import { dayKeyFromDate, isBoardDayKey, rollingBoardDates, todayISO } from '@/lib/dates';
-import { parseQuickWinDragId } from '@/lib/quickWinDrag';
+import { dayKeyFromDate, rollingBoardDates, todayISO } from '@/lib/dates';
 import { cn } from '@/lib/utils';
-
-function targetOf(
-  overId: string,
-  tasks: Task[],
-): { dayKey: DayKey; daypart: Daypart | null; index: number; weekOf: string } | null {
-  const qw = parseQuickWinDragId(overId);
-  if (qw) {
-    return { dayKey: qw.dayKey, daypart: null, weekOf: qw.weekOf, index: 0 };
-  }
-  const section = parseSectionId(overId);
-  if (section) {
-    return { ...section, index: Number.MAX_SAFE_INTEGER };
-  }
-  const overTask = tasks.find((t) => t.id === overId);
-  if (!overTask) return null;
-  const siblings = isBoardDayKey(overTask.dayKey)
-    ? openTasksForDay(tasks, overTask.dayKey, overTask.weekOf)
-    : openTasksFor(
-        tasks,
-        overTask.dayKey,
-        overTask.daypart,
-        overTask.weekOf,
-      );
-  const index = siblings.findIndex((t) => t.id === overTask.id);
-  return {
-    dayKey: overTask.dayKey,
-    daypart: isBoardDayKey(overTask.dayKey) ? null : overTask.daypart,
-    weekOf: overTask.weekOf,
-    index: index === -1 ? 0 : index,
-  };
-}
-
-type ActiveDrag =
-  | { type: 'task'; task: Task }
-  | { type: 'quickwin'; dayKey: DayKey; weekOf: string; tasks: Task[] };
+import { dragOverlay, finishBoardDrop, type ActiveDrag } from './boardDrag';
 
 export function Board() {
   const tasks = useBoardStore((s) => s.tasks);
-  const moveTask = useBoardStore((s) => s.moveTask);
-  const moveQuickWinBundle = useBoardStore((s) => s.moveQuickWinBundle);
-  const updateTask = useBoardStore((s) => s.updateTask);
-  const toggleDone = useBoardStore((s) => s.toggleDone);
   const threshold = useSettingsStore((s) => s.settings.quickWinThresholdMin);
   const focusMode = useUiStore((s) => s.focusMode);
   const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
@@ -149,48 +104,14 @@ export function Board() {
   }, [focusMode, today]);
 
   function onDragStart(e: DragStartEvent) {
-    const qw = parseQuickWinDragId(String(e.active.id));
-    if (qw) {
-      setActiveDrag({
-        type: 'quickwin',
-        dayKey: qw.dayKey,
-        weekOf: qw.weekOf,
-        tasks: quickWinsForDay(tasks, qw.dayKey, threshold, qw.weekOf),
-      });
-      return;
-    }
-    const task = tasks.find((t) => t.id === e.active.id);
-    setActiveDrag(task ? { type: 'task', task } : null);
+    setActiveDrag(dragOverlay(String(e.active.id), tasks, threshold));
   }
 
   function onDragEnd(e: DragEndEvent) {
-    const { active, over } = e;
     const drag = activeDrag;
     setActiveDrag(null);
-    if (!over) return;
-
-    const qw = parseQuickWinDragId(String(active.id));
-    if (qw) {
-      const target = targetOf(String(over.id), tasks);
-      if (!target || target.dayKey === 'gedaan') return;
-      moveQuickWinBundle(qw.dayKey, qw.weekOf, target.dayKey, target.weekOf);
-      return;
-    }
-
-    const task = tasks.find((t) => t.id === active.id) ?? (drag?.type === 'task' ? drag.task : null);
-    if (!task) return;
-    const target = targetOf(String(over.id), tasks);
-    if (!target) return;
-
-    if (target.dayKey === 'gedaan') {
-      if (!task.done) toggleDone(task.id);
-      return;
-    }
-    if (task.done) {
-      updateTask(task.id, { done: false, completedAt: null });
-    }
-    const daypart = isBoardDayKey(target.dayKey) ? null : target.daypart;
-    moveTask(task.id, target.dayKey, daypart, target.index, target.weekOf);
+    if (!e.over) return;
+    finishBoardDrop(String(e.active.id), String(e.over.id), tasks, drag);
   }
 
   return (

@@ -45,8 +45,8 @@ export function MoodQuoteRow() {
         ))}
 
         {quoteBeside && (
-          <div className={cn('h-full min-h-[180px]', count === 1 && 'sm:col-span-2')}>
-            <QuoteAffirmationBlock fill />
+          <div className={cn(count === 1 && 'sm:col-span-2')}>
+            <QuoteAffirmationBlock />
           </div>
         )}
       </div>

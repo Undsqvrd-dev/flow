@@ -5,14 +5,15 @@ import { loadAll } from './sync';
 import { syncEnabled } from './enabled';
 import { repairTaskChecklists } from '@/lib/checklist';
 import { ensureTodayRituals } from '@/lib/db/ensureMeditation';
-import { dirtyRetain, flushPendingSync, persistChecklistRepairs, rememberDay, rememberFocus, rememberGoal, rememberPomodoro, rememberTask, rememberValue } from './liveSync';
+import { dirtyRetain, flushPendingSync, persistChecklistRepairs, rememberDay, rememberFocus, rememberGoal, rememberLifeRule, rememberPomodoro, rememberSport, rememberTask, rememberValue } from './liveSync';
 import { mergeRemoteData, type MergeableStore } from './merge';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useGoalsStore } from '@/stores/useGoalsStore';
 import { useFocusStore } from '@/stores/useFocusStore';
 import { usePomodoroStore } from '@/stores/usePomodoroStore';
+import { useSportStore } from '@/stores/useSportStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
-import { setQuickWinBundleCache } from './bundleCache';
+import { setLabelBundleCache, setQuickWinBundleCache } from './bundleCache';
 import { DEFAULT_SETTINGS } from '@/lib/types';
 
 const REFETCH_DEBOUNCE_MS = 2000;
@@ -38,14 +39,17 @@ export function useVisibilitySync(): void {
       const goalsState = useGoalsStore.getState();
       const focusState = useFocusStore.getState();
       const pomodoroState = usePomodoroStore.getState();
+      const sportState = useSportStore.getState();
 
       const local: MergeableStore = {
         tasks: boardState.tasks,
         goals: goalsState.goals,
         values: goalsState.values,
+        lifeRules: goalsState.lifeRules ?? [],
         focuses: focusState.focuses,
         dayStates: boardState.dayStates,
         pomodoroSessions: pomodoroState.sessions,
+        sportSessions: sportState.sessions,
       };
 
       const merged = mergeRemoteData(
@@ -54,28 +58,35 @@ export function useVisibilitySync(): void {
           tasks: remote.tasks,
           goals: remote.goals,
           values: remote.values,
+          lifeRules: remote.lifeRules,
           focuses: remote.focuses,
           dayStates: remote.dayStates,
           pomodoroSessions: remote.pomodoroSessions,
+          sportSessions: remote.sportSessions,
         },
         dirtyRetain(),
       );
 
       const tasks = repairTaskChecklists(merged.tasks).tasks;
+      const labelBundles = remote.labelBundles.length ? remote.labelBundles : boardState.labelBundles;
       useBoardStore.setState({
         tasks,
         dayStates: merged.dayStates,
         quickWinBundles: remote.quickWinBundles,
+        labelBundles,
       });
       setQuickWinBundleCache(remote.quickWinBundles);
+      setLabelBundleCache(labelBundles);
 
       useGoalsStore.setState({
         goals: merged.goals,
         values: merged.values,
+        lifeRules: merged.lifeRules,
       });
 
       useFocusStore.setState({ focuses: merged.focuses });
       usePomodoroStore.setState({ sessions: merged.pomodoroSessions });
+      useSportStore.setState({ sessions: merged.sportSessions });
 
       const dirty = dirtyRetain();
       for (const task of tasks) {
@@ -87,6 +98,9 @@ export function useVisibilitySync(): void {
       for (const value of merged.values) {
         if (!dirty.values.has(value.id)) rememberValue(value.id, value.updatedAt);
       }
+      for (const rule of merged.lifeRules) {
+        if (!dirty.lifeRules.has(rule.id)) rememberLifeRule(rule.id, rule.updatedAt);
+      }
       for (const focus of merged.focuses) {
         if (!dirty.focuses.has(focus.id)) rememberFocus(focus.id, focus.updatedAt);
       }
@@ -96,12 +110,14 @@ export function useVisibilitySync(): void {
       for (const session of merged.pomodoroSessions) {
         if (!dirty.pomodoroSessions.has(session.id)) rememberPomodoro(session.id, session.updatedAt);
       }
+      for (const session of merged.sportSessions) {
+        if (!dirty.sportSessions.has(session.id)) rememberSport(session.id, session.updatedAt);
+      }
       persistChecklistRepairs();
-      await ensureTodayRituals();
-
       useSettingsStore.setState({
         settings: { ...DEFAULT_SETTINGS, ...remote.settings },
       });
+      await ensureTodayRituals();
 
       console.log('[flow sync] visibility refetch complete');
     } catch (err) {

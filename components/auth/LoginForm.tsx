@@ -49,7 +49,9 @@ export function LoginForm() {
       router.refresh();
     } catch (err) {
       setStatus('error');
-      setMessage(err instanceof Error ? err.message : 'Inloggen mislukt.');
+      const raw = err instanceof Error ? err.message : '';
+      const offline = raw === 'Failed to fetch' || /network|offline|internet/i.test(raw);
+      setMessage(offline ? 'Geen verbinding. Controleer je internet en probeer opnieuw.' : raw || 'Inloggen mislukt.');
     }
   }
 

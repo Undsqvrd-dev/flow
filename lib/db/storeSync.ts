@@ -1,24 +1,32 @@
+import { getLabelBundleCache } from '@/lib/db/bundleCache';
 import { syncEnabled } from '@/lib/db/enabled';
+import type { LabelBundle } from '@/lib/labelBundle';
 import {
   enqueueDayStates,
   enqueueFocuses,
   enqueueGoals,
+  enqueueLifeRules,
   enqueuePomodoro,
+  enqueueSport,
   enqueueTasks,
   enqueueValues,
   forgetGoal,
+  forgetLifeRule,
+  forgetSport,
   forgetTask,
   forgetValue,
 } from '@/lib/db/liveSync';
 import {
   deleteGoal,
+  deleteLifeRule,
+  deleteSportSession,
   deleteTask,
   deleteTasks,
   deleteValue,
   runSync,
   upsertSettings,
 } from '@/lib/db/sync';
-import type { DayState, Focus, Goal, PomodoroSession, Settings, Task, Value } from '@/lib/types';
+import type { DayState, Focus, Goal, LifeRule, PomodoroSession, Settings, SportSession, Task, Value } from '@/lib/types';
 
 export function syncTasks(tasks: Task[], previous: readonly Task[], rollback: () => void): void {
   if (!syncEnabled()) {
@@ -62,6 +70,21 @@ export function syncRemoveValue(id: string, rollback: () => void): void {
   runSync(() => deleteValue(id), rollback);
 }
 
+export function syncLifeRules(
+  rules: LifeRule[],
+  previous: readonly LifeRule[],
+  rollback: () => void,
+): void {
+  if (!syncEnabled()) return;
+  enqueueLifeRules(rules, previous, rollback);
+}
+
+export function syncRemoveLifeRule(id: string, rollback: () => void): void {
+  if (!syncEnabled()) return;
+  forgetLifeRule(id);
+  runSync(() => deleteLifeRule(id), rollback);
+}
+
 export function syncFocuses(focuses: Focus[], previous: readonly Focus[], rollback: () => void): void {
   if (!syncEnabled()) return;
   enqueueFocuses(focuses, previous, rollback);
@@ -85,11 +108,27 @@ export function syncPomodoro(
   enqueuePomodoro(sessions, previous, rollback);
 }
 
+export function syncSport(
+  sessions: SportSession[],
+  previous: readonly SportSession[],
+  rollback: () => void,
+): void {
+  if (!syncEnabled()) return;
+  enqueueSport(sessions, previous, rollback);
+}
+
+export function syncRemoveSport(id: string, rollback: () => void): void {
+  if (!syncEnabled()) return;
+  forgetSport(id);
+  runSync(() => deleteSportSession(id), rollback);
+}
+
 export function syncSettingsData(
   settings: Settings,
   quickWinBundles: string[],
   rollback: () => void,
+  labelBundles: LabelBundle[] = getLabelBundleCache(),
 ): void {
   if (!syncEnabled()) return;
-  runSync(() => upsertSettings(settings, quickWinBundles), rollback);
+  runSync(() => upsertSettings(settings, quickWinBundles, labelBundles), rollback);
 }

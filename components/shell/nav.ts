@@ -1,9 +1,10 @@
 import {
   LayoutDashboard,
   Columns3,
-  Timer,
   Inbox,
   Target,
+  Heart,
+  Dumbbell,
   BarChart3,
   Settings,
 } from 'lucide-react';
@@ -11,9 +12,10 @@ import {
 export const MENU = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/board', label: 'Weekbord', icon: Columns3 },
-  { href: '/focus', label: 'Timer', icon: Timer },
   { href: '/dump', label: 'Inspiratie', icon: Inbox },
   { href: '/goals', label: 'Doelen', icon: Target },
+  { href: '/waarden', label: 'Mijn Waarden', icon: Heart },
+  { href: '/sport', label: 'Sport', icon: Dumbbell },
 ] as const;
 
 export const ALGEMEEN = [

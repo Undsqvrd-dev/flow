@@ -25,7 +25,7 @@ function LotusIcon({ className }: { className?: string }) {
 }
 
 /** Huidige en langste reeks afgevinkte meditatiedagen. */
-export function MeditationStreakCard() {
+export function MeditationStreakCard({ compact = false }: { compact?: boolean }) {
   const tasks = useBoardStore((s) => s.tasks);
   const today = useTodayISO();
   const { current, longest } = meditationStreak(tasks, today);
@@ -33,7 +33,7 @@ export function MeditationStreakCard() {
   const todayLabel = todayTask?.done ? 'Vandaag gedaan' : todayTask ? 'Vandaag nog open' : null;
 
   return (
-    <div className="meditation-streak-tile relative flex h-full min-h-[200px] flex-col overflow-hidden rounded-panel p-5 md:p-6">
+    <div className={`meditation-streak-tile relative flex h-full flex-col overflow-hidden rounded-panel p-4 md:p-5 ${compact ? 'meditation-streak-tile--compact min-h-[120px]' : 'min-h-[200px] md:p-6'}`}>
       <LotusIcon className="meditation-streak-watermark pointer-events-none absolute -right-4 -top-5 h-32 w-32" />
       <div className="relative mb-5 flex items-center gap-2">
         <LotusIcon className="meditation-streak-icon h-[18px] w-[18px] shrink-0" />

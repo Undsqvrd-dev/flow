@@ -2,12 +2,14 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Goal, GoalHorizon, GoalScope, Value } from '@/lib/types';
+import type { Goal, GoalHorizon, GoalScope, LifeRule, Value } from '@/lib/types';
 import { nextRank, uid } from '@/lib/utils';
 import { UNKNOWN_UPDATED_AT } from '@/lib/db/conflict';
 import {
   syncGoals,
   syncRemoveGoal,
+  syncLifeRules,
+  syncRemoveLifeRule,
   syncRemoveValue,
   syncValues,
 } from '@/lib/db/storeSync';
@@ -25,6 +27,7 @@ export interface NewGoalInput {
 interface GoalsState {
   goals: Goal[];
   values: Value[];
+  lifeRules: LifeRule[];
 
   addGoal: (input: NewGoalInput) => Goal;
   updateGoal: (id: string, patch: Partial<Goal>) => void;
@@ -34,6 +37,10 @@ interface GoalsState {
   addValue: (text: string) => void;
   updateValue: (id: string, text: string) => void;
   removeValue: (id: string) => void;
+
+  addLifeRule: (text: string) => void;
+  updateLifeRule: (id: string, text: string) => void;
+  removeLifeRule: (id: string) => void;
 }
 
 export const useGoalsStore = create<GoalsState>()(
@@ -41,6 +48,7 @@ export const useGoalsStore = create<GoalsState>()(
     (set, get) => ({
       goals: [],
       values: [],
+      lifeRules: [],
 
       addGoal: (input) => {
         const now = new Date().toISOString();
@@ -118,6 +126,32 @@ export const useGoalsStore = create<GoalsState>()(
         set({ values: prev.filter((v) => v.id !== id) });
         syncRemoveValue(id, () => set({ values: prev }));
       },
+
+      addLifeRule: (text) => {
+        const prev = get().lifeRules ?? [];
+        const now = new Date().toISOString();
+        const rule: LifeRule = {
+          id: uid(),
+          text,
+          rank: nextRank(prev.map((rule) => rule.rank)),
+          updatedAt: now,
+        };
+        set({ lifeRules: [...prev, rule] });
+        syncLifeRules([rule], prev, () => set({ lifeRules: prev }));
+      },
+      updateLifeRule: (id, text) => {
+        const prev = get().lifeRules ?? [];
+        const now = new Date().toISOString();
+        const next = prev.map((rule) => (rule.id === id ? { ...rule, text, updatedAt: now } : rule));
+        set({ lifeRules: next });
+        const updated = next.find((rule) => rule.id === id);
+        if (updated) syncLifeRules([updated], prev, () => set({ lifeRules: prev }));
+      },
+      removeLifeRule: (id) => {
+        const prev = get().lifeRules ?? [];
+        set({ lifeRules: prev.filter((rule) => rule.id !== id) });
+        syncRemoveLifeRule(id, () => set({ lifeRules: prev }));
+      },
     }),
     {
       name: 'flow-goals',
@@ -135,9 +169,13 @@ export const useGoalsStore = create<GoalsState>()(
             ...v,
             updatedAt: v.updatedAt ?? UNKNOWN_UPDATED_AT,
           })),
+          lifeRules: (state.lifeRules ?? []).map((rule) => ({
+            ...rule,
+            updatedAt: rule.updatedAt ?? UNKNOWN_UPDATED_AT,
+          })),
         };
       },
-      version: 2,
+      version: 3,
     },
   ),
 );

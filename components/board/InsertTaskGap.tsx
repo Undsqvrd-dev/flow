@@ -13,6 +13,8 @@ type Props = {
   insertBeforeId?: string;
   /** 'before' = boven de kaart, 'after' = onder de kaart (tussenruimte). */
   edge?: 'before' | 'after';
+  labels?: string[];
+  bundleId?: string;
 };
 
 /** Subtiele hover-hint; absoluut gepositioneerd zodat kaartruimte klein blijft. */
@@ -22,6 +24,8 @@ export function InsertTaskGap({
   weekOf: columnWeekOf,
   insertBeforeId,
   edge = 'after',
+  labels,
+  bundleId,
 }: Props) {
   const [editing, setEditing] = useState(false);
 
@@ -38,6 +42,8 @@ export function InsertTaskGap({
           daypart={daypart}
           weekOf={columnWeekOf}
           insertBeforeId={insertBeforeId}
+          labels={labels}
+          bundleId={bundleId}
           position={insertBeforeId ? undefined : 'start'}
           autoEdit
           onClose={() => setEditing(false)}

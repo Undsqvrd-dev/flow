@@ -3,12 +3,15 @@ import type {
   DayState,
   Focus,
   Goal,
+  LifeRule,
   PomodoroSession,
   Settings,
+  SportSession,
   Task,
   Value,
 } from '@/lib/types';
 import { writeVersioned } from '@/lib/db/versionedWrite';
+import type { LabelBundle } from '@/lib/labelBundle';
 import {
   dayStateFromRow,
   dayStateToRow,
@@ -16,8 +19,12 @@ import {
   focusToRow,
   goalFromRow,
   goalToRow,
+  lifeRuleFromRow,
+  lifeRuleToRow,
   pomodoroFromRow,
   pomodoroToRow,
+  sportFromRow,
+  sportToRow,
   settingsFromRow,
   settingsToData,
   taskFromRow,
@@ -27,8 +34,10 @@ import {
   type DayStateRow,
   type FocusRow,
   type GoalRow,
+  type LifeRuleRow,
   type PomodoroRow,
   type SettingsRow,
+  type SportRow,
   type TaskRow,
   type ValueRow,
 } from '@/lib/supabase/mappers';
@@ -37,15 +46,25 @@ export type RemoteBundle = {
   tasks: Task[];
   goals: Goal[];
   values: Value[];
+  lifeRules: LifeRule[];
   focuses: Focus[];
   dayStates: DayState[];
   pomodoroSessions: PomodoroSession[];
+  sportSessions: SportSession[];
   settings: Settings;
   quickWinBundles: string[];
+  labelBundles: LabelBundle[];
 };
 
 function client() {
   return createClient();
+}
+
+function isMissingLifeRulesTable(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const message = error.message ?? '';
+  const missing = error.code === 'PGRST205' || error.code === '42P01' || /does not exist|schema cache/i.test(message);
+  return missing && /flow_life_rules/.test(message);
 }
 
 export function isRemoteEmpty(data: RemoteBundle): boolean {
@@ -53,9 +72,11 @@ export function isRemoteEmpty(data: RemoteBundle): boolean {
     data.tasks.length === 0 &&
     data.goals.length === 0 &&
     data.values.length === 0 &&
+    data.lifeRules.length === 0 &&
     data.focuses.length === 0 &&
     data.dayStates.length === 0 &&
-    data.pomodoroSessions.length === 0
+    data.pomodoroSessions.length === 0 &&
+    data.sportSessions.length === 0
   );
 }
 
@@ -66,17 +87,21 @@ export async function loadAll(): Promise<RemoteBundle> {
     tasksRes,
     goalsRes,
     valuesRes,
+    lifeRulesRes,
     focusRes,
     dayRes,
     pomoRes,
+    sportRes,
     settingsRes,
   ] = await Promise.all([
     supabase.from('tasks').select('*'),
     supabase.from('goals').select('*'),
     supabase.from('flow_values').select('*'),
+    supabase.from('flow_life_rules').select('*'),
     supabase.from('focus').select('*'),
     supabase.from('day_states').select('*'),
     supabase.from('pomodoro_sessions').select('*'),
+    supabase.from('sport_sessions').select('*'),
     supabase.from('settings').select('*').maybeSingle(),
   ]);
 
@@ -84,9 +109,11 @@ export async function loadAll(): Promise<RemoteBundle> {
     tasksRes.error,
     goalsRes.error,
     valuesRes.error,
+    lifeRulesRes.error && !isMissingLifeRulesTable(lifeRulesRes.error) ? lifeRulesRes.error : null,
     focusRes.error,
     dayRes.error,
     pomoRes.error,
+    sportRes.error,
     settingsRes.error,
   ].filter(Boolean);
 
@@ -94,7 +121,7 @@ export async function loadAll(): Promise<RemoteBundle> {
     throw new Error(errors[0]?.message ?? 'Laden uit Supabase mislukt');
   }
 
-  const { settings, quickWinBundles } = settingsFromRow(
+  const { settings, quickWinBundles, labelBundles } = settingsFromRow(
     (settingsRes.data as SettingsRow | null)?.data ?? null,
   );
 
@@ -102,11 +129,16 @@ export async function loadAll(): Promise<RemoteBundle> {
     tasks: ((tasksRes.data ?? []) as TaskRow[]).map(taskFromRow),
     goals: ((goalsRes.data ?? []) as GoalRow[]).map(goalFromRow),
     values: ((valuesRes.data ?? []) as ValueRow[]).map(valueFromRow),
+    lifeRules: lifeRulesRes.error
+      ? []
+      : ((lifeRulesRes.data ?? []) as LifeRuleRow[]).map(lifeRuleFromRow),
     focuses: ((focusRes.data ?? []) as FocusRow[]).map(focusFromRow),
     dayStates: ((dayRes.data ?? []) as DayStateRow[]).map(dayStateFromRow),
     pomodoroSessions: ((pomoRes.data ?? []) as PomodoroRow[]).map(pomodoroFromRow),
+    sportSessions: ((sportRes.data ?? []) as SportRow[]).map(sportFromRow),
     settings,
     quickWinBundles,
+    labelBundles,
   };
 }
 
@@ -125,7 +157,7 @@ const EMPTY_RECONCILE = { serverWins: [], removedKeys: [], written: [] };
 async function reconcileRows<T>(
   items: readonly T[],
   spec: (item: T) => {
-    table: 'tasks' | 'goals' | 'flow_values' | 'focus' | 'day_states' | 'pomodoro_sessions';
+    table: 'tasks' | 'goals' | 'flow_values' | 'flow_life_rules' | 'focus' | 'day_states' | 'pomodoro_sessions' | 'sport_sessions';
     key: 'id' | 'date';
     id: string;
     row: Record<string, unknown>;
@@ -204,6 +236,28 @@ export async function deleteValue(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function upsertLifeRules(rules: LifeRule[]): Promise<ReconcileResult<LifeRule>> {
+  if (!rules.length) return EMPTY_RECONCILE;
+  try {
+    return await reconcileRows(rules, (rule) => ({
+      table: 'flow_life_rules',
+      key: 'id',
+      id: rule.id,
+      row: asRow(lifeRuleToRow(rule)),
+      parse: (row) => lifeRuleFromRow(row as unknown as LifeRuleRow),
+    }));
+  } catch (error) {
+    if (isMissingLifeRulesTable(error as { code?: string; message?: string })) return EMPTY_RECONCILE;
+    throw error;
+  }
+}
+
+export async function deleteLifeRule(id: string): Promise<void> {
+  const { error } = await client().from('flow_life_rules').delete().eq('id', id);
+  if (isMissingLifeRulesTable(error)) return;
+  if (error) throw error;
+}
+
 export async function upsertFocuses(focuses: Focus[]): Promise<ReconcileResult<Focus>> {
   return reconcileRows(focuses, (focus) => ({
     table: 'focus',
@@ -236,9 +290,27 @@ export async function upsertPomodoroSessions(
   }));
 }
 
+export async function upsertSportSessions(
+  sessions: SportSession[],
+): Promise<ReconcileResult<SportSession>> {
+  return reconcileRows(sessions, (session) => ({
+    table: 'sport_sessions',
+    key: 'id',
+    id: session.id,
+    row: asRow(sportToRow(session)),
+    parse: (row) => sportFromRow(row as unknown as SportRow),
+  }));
+}
+
+export async function deleteSportSession(id: string): Promise<void> {
+  const { error } = await client().from('sport_sessions').delete().eq('id', id);
+  if (error) throw error;
+}
+
 export async function upsertSettings(
   settings: Settings,
   quickWinBundles: string[],
+  labelBundles: LabelBundle[] = [],
 ): Promise<void> {
   const supabase = client();
   const {
@@ -248,7 +320,7 @@ export async function upsertSettings(
 
   const { error } = await supabase.from('settings').upsert({
     user_id: user.id,
-    data: settingsToData(settings, quickWinBundles),
+    data: settingsToData(settings, quickWinBundles, labelBundles),
   });
   if (error) throw error;
 }
@@ -256,11 +328,13 @@ export async function upsertSettings(
 export async function pushAll(data: RemoteBundle): Promise<void> {
   await upsertGoals(data.goals);
   await upsertValues(data.values);
+  await upsertLifeRules(data.lifeRules);
   await upsertTasks(data.tasks);
   await upsertFocuses(data.focuses);
   await upsertDayStates(data.dayStates);
   await upsertPomodoroSessions(data.pomodoroSessions);
-  await upsertSettings(data.settings, data.quickWinBundles);
+  await upsertSportSessions(data.sportSessions);
+  await upsertSettings(data.settings, data.quickWinBundles, data.labelBundles);
 }
 
 /** Fire-and-forget met rollback bij fout. */

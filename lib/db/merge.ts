@@ -3,18 +3,22 @@ import type {
   Task,
   Goal,
   Value,
+  LifeRule,
   Focus,
   DayState,
   PomodoroSession,
+  SportSession,
 } from '@/lib/types';
 
 export interface MergeableStore {
   tasks: Task[];
   goals: Goal[];
   values: Value[];
+  lifeRules: LifeRule[];
   focuses: Focus[];
   dayStates: DayState[];
   pomodoroSessions: PomodoroSession[];
+  sportSessions: SportSession[];
 }
 
 type WithUpdatedAt = { updatedAt: string };
@@ -24,9 +28,11 @@ export interface RetainLocalIds {
   tasks?: ReadonlySet<string>;
   goals?: ReadonlySet<string>;
   values?: ReadonlySet<string>;
+  lifeRules?: ReadonlySet<string>;
   focuses?: ReadonlySet<string>;
   dayStates?: ReadonlySet<string>;
   pomodoroSessions?: ReadonlySet<string>;
+  sportSessions?: ReadonlySet<string>;
 }
 
 const EMPTY: ReadonlySet<string> = new Set();
@@ -101,12 +107,18 @@ export function mergeRemoteData(
     tasks: mergeById(local.tasks, remote.tasks, retain.tasks ?? EMPTY),
     goals: mergeById(local.goals, remote.goals, retain.goals ?? EMPTY),
     values: mergeById(local.values, remote.values, retain.values ?? EMPTY),
+    lifeRules: mergeById(local.lifeRules, remote.lifeRules, retain.lifeRules ?? EMPTY),
     focuses: mergeById(local.focuses, remote.focuses, retain.focuses ?? EMPTY),
     dayStates: mergeByKey(local.dayStates, remote.dayStates, (d) => d.date, retain.dayStates ?? EMPTY),
     pomodoroSessions: mergeById(
       local.pomodoroSessions,
       remote.pomodoroSessions,
       retain.pomodoroSessions ?? EMPTY,
+    ),
+    sportSessions: mergeById(
+      local.sportSessions,
+      remote.sportSessions,
+      retain.sportSessions ?? EMPTY,
     ),
   };
 }

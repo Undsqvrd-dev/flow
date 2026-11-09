@@ -178,3 +178,16 @@ h1, h2, h3 {
   color: var(--meditation-ink-soft);
 }
 
+.meditation-streak-tile--compact .meditation-streak-count {
+  font-size: 40px;
+}
+
+.meditation-streak-tile--compact .meditation-streak-longest {
+  font-size: 22px;
+}
+
+.meditation-streak-tile--compact .meditation-streak-watermark {
+  height: 5.5rem;
+  width: 5.5rem;
+}
+

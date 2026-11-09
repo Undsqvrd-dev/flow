@@ -5,9 +5,11 @@ type SyncTable =
   | 'tasks'
   | 'goals'
   | 'flow_values'
+  | 'flow_life_rules'
   | 'focus'
   | 'day_states'
-  | 'pomodoro_sessions';
+  | 'pomodoro_sessions'
+  | 'sport_sessions';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

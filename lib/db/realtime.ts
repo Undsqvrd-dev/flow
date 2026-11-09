@@ -9,12 +9,14 @@ import {
   focusFromRow,
   dayStateFromRow,
   pomodoroFromRow,
+  sportFromRow,
   type TaskRow,
   type GoalRow,
   type ValueRow,
   type FocusRow,
   type DayStateRow,
   type PomodoroRow,
+  type SportRow,
 } from '@/lib/supabase/mappers';
 import { repairTaskChecklists } from '@/lib/checklist';
 import { applyDelete, applyUpsert } from '@/lib/db/applyRemote';
@@ -24,6 +26,8 @@ import {
   goalDirtyIds,
   pomodoroDirtyIds,
   rememberDay,
+  rememberSport,
+  sportDirtyIds,
   rememberFocus,
   rememberGoal,
   rememberPomodoro,
@@ -37,6 +41,7 @@ import { useBoardStore } from '@/stores/useBoardStore';
 import { useGoalsStore } from '@/stores/useGoalsStore';
 import { useFocusStore } from '@/stores/useFocusStore';
 import { usePomodoroStore } from '@/stores/usePomodoroStore';
+import { reconcileSportSessions, useSportStore } from '@/stores/useSportStore';
 
 interface RealtimePayload {
   eventType: 'INSERT' | 'UPDATE' | 'DELETE';
@@ -58,6 +63,7 @@ function handleTaskChange(payload: RealtimePayload): void {
     useBoardStore.setState({
       tasks: applyDelete(state.tasks, textField(payload.old, 'id'), (task) => task.id),
     });
+    reconcileSportSessions(useBoardStore.getState().tasks);
     return;
   }
   const task = taskFromRow(payload.new as unknown as TaskRow);
@@ -68,6 +74,7 @@ function handleTaskChange(payload: RealtimePayload): void {
   }
   if (applied !== state.tasks) rememberTask(task.id, task.updatedAt);
   persistChecklistRepairs();
+  reconcileSportSessions(useBoardStore.getState().tasks);
 }
 
 function handleGoalChange(payload: RealtimePayload): void {
@@ -145,6 +152,21 @@ function handlePomodoroChange(payload: RealtimePayload): void {
   rememberPomodoro(session.id, session.updatedAt);
 }
 
+function handleSportChange(payload: RealtimePayload): void {
+  const state = useSportStore.getState();
+  if (payload.eventType === 'DELETE') {
+    useSportStore.setState({
+      sessions: applyDelete(state.sessions, textField(payload.old, 'id'), (session) => session.id),
+    });
+    return;
+  }
+  const session = sportFromRow(payload.new as unknown as SportRow);
+  const next = applyUpsert(state.sessions, session, (item) => item.id, sportDirtyIds());
+  if (next === state.sessions) return;
+  useSportStore.setState({ sessions: next });
+  rememberSport(session.id, session.updatedAt);
+}
+
 export function subscribeToRealtime(): void {
   if (isSubscribed || typeof window === 'undefined') return;
 
@@ -181,6 +203,11 @@ export function subscribeToRealtime(): void {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'pomodoro_sessions' },
       handlePomodoroChange,
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'sport_sessions' },
+      handleSportChange,
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {

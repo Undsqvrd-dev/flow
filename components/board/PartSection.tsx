@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ChevronDown } from 'lucide-react';
 import type { DayKey, Daypart, Task } from '@/lib/types';
-import { TaskCard } from './TaskCard';
+import { TaskStack } from './TaskStack';
 import { AddTaskInline } from './AddTaskInline';
-import { InsertTaskGap } from './InsertTaskGap';
 import { DAYPART_LABELS, weekOf } from '@/lib/dates';
 import { cn, formatMinutes } from '@/lib/utils';
 
@@ -105,31 +103,7 @@ export function PartSection({
           )}
         >
           {children}
-          <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-            {tasks.map((task, i) => (
-              <div key={task.id} className="relative">
-                {i === 0 && (
-                  <InsertTaskGap
-                    dayKey={dayKey}
-                    daypart={daypart}
-                    weekOf={columnWeek}
-                    insertBeforeId={task.id}
-                    edge="before"
-                  />
-                )}
-                <TaskCard task={task} />
-                {i < tasks.length - 1 && (
-                  <InsertTaskGap
-                    dayKey={dayKey}
-                    daypart={daypart}
-                    weekOf={columnWeek}
-                    insertBeforeId={tasks[i + 1].id}
-                    edge="after"
-                  />
-                )}
-              </div>
-            ))}
-          </SortableContext>
+          <TaskStack tasks={tasks} dayKey={dayKey} daypart={daypart} weekOf={columnWeek} />
           {showAdd && (
             <AddTaskInline dayKey={dayKey} daypart={daypart} weekOf={columnWeek} />
           )}
