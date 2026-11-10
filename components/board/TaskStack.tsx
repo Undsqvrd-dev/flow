@@ -51,6 +51,7 @@ function TaskRow({
   labels?: string[];
   bundleId?: string;
 }) {
+  const card = <TaskCard task={task} />;
   return (
     <div className="relative">
       {first && (
@@ -64,9 +65,7 @@ function TaskRow({
           bundleId={bundleId}
         />
       )}
-      <BundleDropRing task={task}>
-        <TaskCard task={task} />
-      </BundleDropRing>
+      {dayKey === 'gedaan' ? card : <BundleDropRing task={task}>{card}</BundleDropRing>}
       {nextId && (
         <InsertTaskGap
           dayKey={dayKey}
@@ -97,7 +96,11 @@ export function TaskStack({
   const bundles = useBoardStore((s) => s.labelBundles);
   const labelDefs = useSettingsStore((s) => s.settings.labels ?? []);
   const [closed, setClosed] = useState<Record<string, boolean>>({});
-  const blocks = blocksForTasks(tasks, bundles);
+  // Gedaan toont afgeronde taken los; de bundel blijft bestaan op de dagkolom.
+  const blocks =
+    dayKey === 'gedaan'
+      ? tasks.map((task) => ({ kind: 'task' as const, task }))
+      : blocksForTasks(tasks, bundles);
   const visual = blocks.flatMap((block) => {
     if (block.kind === 'task') return [block.task];
     return closed[block.bundle.id] ? [] : block.tasks;

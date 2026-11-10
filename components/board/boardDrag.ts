@@ -70,15 +70,18 @@ export function finishBoardDrop(activeId: string, overId: string, tasks: Task[],
 
   const task = tasks.find((item) => item.id === activeId) ?? (drag?.type === 'task' ? drag.task : null);
   if (!task) return;
+  const overTask = tasks.find((item) => item.id === overId);
   const plan = planDrop(task.id, task.labels, overId, tasks, store.labelBundles);
-  if (plan.type === 'join') {
+  // Afgeronde kaarten staan alleen in Gedaan; daar ontstaat geen nieuwe bundel.
+  const keepLoose = overTask?.done === true;
+  if (!keepLoose && plan.type === 'join') {
     store.setLabelBundles(joinBundle(store.labelBundles, plan.bundleId, task.id));
     if (!task.labels.includes(plan.labelId)) {
       store.updateTask(task.id, { labels: [...task.labels, plan.labelId] });
     }
-  } else if (plan.type === 'bundle') {
+  } else if (!keepLoose && plan.type === 'bundle') {
     store.setLabelBundles(bundlePair(store.labelBundles, plan.labelId, task.id, overId, uid()));
-  } else if (plan.detach) {
+  } else if (plan.type === 'move' && plan.detach) {
     store.setLabelBundles(detachTask(store.labelBundles, task.id));
   }
 
