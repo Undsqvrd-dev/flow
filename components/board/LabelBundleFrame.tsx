@@ -1,10 +1,10 @@
 'use client';
 
-import { useDndContext, useDroppable } from '@dnd-kit/core';
-import { ChevronDown } from 'lucide-react';
-import type { CSSProperties, ReactNode } from 'react';
+import { useDraggable, useDndContext, useDroppable } from '@dnd-kit/core';
+import { ChevronDown, GripVertical } from 'lucide-react';
+import { useRef, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import type { LabelDef, Task } from '@/lib/types';
-import { bundleDropId, tint, type LabelBundle } from '@/lib/labelBundle';
+import { bundleDropId, labelBundleDragId, tint, type LabelBundle } from '@/lib/labelBundle';
 import { cn } from '@/lib/utils';
 
 function frameStyle(color: string | undefined): CSSProperties | undefined {
@@ -22,6 +22,7 @@ export function LabelBundleFrame({
   label,
   open,
   onToggle,
+  overlay = false,
   children,
 }: {
   bundle: LabelBundle;
@@ -29,24 +30,48 @@ export function LabelBundleFrame({
   label: LabelDef | undefined;
   open: boolean;
   onToggle: () => void;
+  /** Alleen het voorbeeld tijdens het slepen. */
+  overlay?: boolean;
   children: ReactNode;
 }) {
   const name = label?.name ?? 'Bundel';
   const done = tasks.filter((task) => task.done).length;
   const dropId = bundleDropId(bundle.id);
-  const { setNodeRef } = useDroppable({ id: dropId });
+  const { setNodeRef } = useDroppable({ id: dropId, disabled: overlay });
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: labelBundleDragId(bundle.id),
+    disabled: overlay,
+  });
   const { active, over } = useDndContext();
   const activeId = active ? String(active.id) : '';
   const overId = over ? String(over.id) : '';
   const hot =
     activeId.length > 0 &&
+    activeId !== labelBundleDragId(bundle.id) &&
     !bundle.taskIds.includes(activeId) &&
     (overId === dropId || tasks.some((task) => task.id === overId));
+  const press = useRef<{ x: number; y: number } | null>(null);
+
+  function onPointerDown(event: PointerEvent<HTMLButtonElement>) {
+    press.current = { x: event.clientX, y: event.clientY };
+    listeners?.onPointerDown?.(event);
+  }
+
+  function onHeaderClick(event: MouseEvent<HTMLButtonElement>) {
+    const start = press.current;
+    press.current = null;
+    if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 6) return;
+    onToggle();
+  }
 
   return (
     <div
-      ref={setNodeRef}
-      className="flex flex-col gap-1.5 rounded-card border border-green-200 bg-green-50 p-1.5 dark:border-green-700/50"
+      ref={overlay ? undefined : setNodeRef}
+      className={cn(
+        'flex flex-col gap-1.5 rounded-card border border-green-200 bg-green-50 p-1.5 dark:border-green-700/50',
+        isDragging && 'opacity-40',
+        overlay && 'rotate-2 shadow-soft-lg',
+      )}
       style={{
         ...frameStyle(label?.color),
         ...(hot && label?.color ? { outline: `2px solid ${label.color}`, outlineOffset: 2 } : {}),
@@ -55,11 +80,17 @@ export function LabelBundleFrame({
     >
       <button
         type="button"
-        onClick={onToggle}
+        ref={overlay ? undefined : setDragRef}
         aria-expanded={open}
         aria-label={open ? `${name} inklappen` : `${name} uitklappen`}
-        className="flex w-full items-center gap-1.5 rounded-[8px] px-1 py-0.5 text-left cursor-pointer"
+        title="Versleep de bundel"
+        className="flex w-full items-center gap-1.5 rounded-[8px] px-1 py-0.5 text-left cursor-grab touch-none active:cursor-grabbing"
+        {...(overlay ? {} : attributes)}
+        {...(overlay ? {} : listeners)}
+        onPointerDown={overlay ? undefined : onPointerDown}
+        onClick={onHeaderClick}
       >
+        <GripVertical size={14} strokeWidth={2} className="shrink-0 text-muted" aria-hidden />
         <ChevronDown
           size={14}
           strokeWidth={2}

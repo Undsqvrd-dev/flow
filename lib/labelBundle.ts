@@ -164,7 +164,36 @@ export function bundleDropId(bundleId: string): string {
 }
 
 export function parseBundleDropId(id: string): string | null {
-  return id.startsWith('lb:') ? id.slice(3) : null;
+  return id.startsWith('lb:') && !id.startsWith('lbm:') ? id.slice(3) : null;
+}
+
+/** Sleep-id van een heel labelblok, los van de drop-zone `lb:`. */
+export function labelBundleDragId(bundleId: string): string {
+  return `lbm:${bundleId}`;
+}
+
+export function parseLabelBundleDragId(id: string): string | null {
+  return id.startsWith('lbm:') ? id.slice(4) : null;
+}
+
+/**
+ * Zet een blok taken op één plek in een kolom.
+ * `siblingIds` is de kolom zonder het blok. `beforeId` null = achteraan.
+ */
+export function spliceBundle(
+  siblingIds: readonly string[],
+  movingIds: readonly string[],
+  beforeId: string | null,
+): string[] {
+  const rest = siblingIds.filter((id) => !movingIds.includes(id));
+  let index = rest.length;
+  if (beforeId) {
+    const at = rest.indexOf(beforeId);
+    if (at >= 0) index = at;
+  }
+  const next = [...rest];
+  next.splice(index, 0, ...movingIds);
+  return next;
 }
 
 /** Voegt één kaart toe aan een bestaand blok en haalt haar uit een andere groep. */

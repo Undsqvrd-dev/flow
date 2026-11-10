@@ -1,14 +1,36 @@
+import { pointerWithin, rectIntersection, type CollisionDetection } from '@dnd-kit/core';
 import type { DayKey, Daypart, Task } from '@/lib/types';
 import { isBoardDayKey } from '@/lib/dates';
-import { bundlePair, detachTask, joinBundle, parseBundleDropId, planDrop } from '@/lib/labelBundle';
+import {
+  bundlePair,
+  detachTask,
+  joinBundle,
+  parseBundleDropId,
+  parseLabelBundleDragId,
+  planDrop,
+  type LabelBundle,
+} from '@/lib/labelBundle';
 import { parseQuickWinDragId } from '@/lib/quickWinDrag';
 import { uid } from '@/lib/utils';
 import { openTasksFor, openTasksForDay, quickWinsForDay, useBoardStore } from '@/stores/useBoardStore';
-import { parseSectionId } from './PartSection';
+import { parseSectionId } from '@/lib/sectionDrop';
 
 export type ActiveDrag =
   | { type: 'task'; task: Task }
-  | { type: 'quickwin'; dayKey: DayKey; weekOf: string; tasks: Task[] };
+  | { type: 'quickwin'; dayKey: DayKey; weekOf: string; tasks: Task[] }
+  | { type: 'label-bundle'; bundle: LabelBundle; tasks: Task[] };
+
+export type LabelBundleDrop =
+  | { type: 'skip' }
+  | { type: 'done' }
+  | {
+      type: 'place';
+      dayKey: DayKey;
+      daypart: Daypart | null;
+      weekOf: string;
+      beforeId: string | null;
+      atStart: boolean;
+    };
 
 export function targetOf(
   overId: string,
@@ -44,7 +66,101 @@ function memberId(
   return member?.id ?? overId;
 }
 
-export function dragOverlay(activeId: string, tasks: Task[], threshold: number): ActiveDrag | null {
+/** Waar een gesleepte labelbundel landt. Eigen kop of eigen kaart: niet verplaatsen. */
+export function resolveLabelBundleDrop(
+  bundleId: string,
+  overId: string,
+  tasks: readonly Task[],
+  bundles: readonly LabelBundle[],
+): LabelBundleDrop {
+  if (parseLabelBundleDragId(overId) === bundleId || parseBundleDropId(overId) === bundleId) {
+    return { type: 'skip' };
+  }
+  const bundle = bundles.find((item) => item.id === bundleId);
+  const moving = new Set(
+    tasks.filter((task) => bundle?.taskIds.includes(task.id) && !task.done).map((task) => task.id),
+  );
+  if (moving.has(overId)) return { type: 'skip' };
+
+  const otherBundleId = parseLabelBundleDragId(overId) ?? parseBundleDropId(overId);
+  let landingId = overId;
+  if (otherBundleId) {
+    const other = bundles.find((item) => item.id === otherBundleId);
+    const anchor = tasks
+      .filter((task) => other?.taskIds.includes(task.id) && !task.done && !moving.has(task.id))
+      .sort((a, b) => a.rank - b.rank)[0];
+    if (!anchor) return { type: 'skip' };
+    landingId = anchor.id;
+  }
+
+  const section = parseSectionId(landingId);
+  if (section) {
+    if (section.dayKey === 'gedaan') return { type: 'done' };
+    return {
+      type: 'place',
+      dayKey: section.dayKey,
+      daypart: isBoardDayKey(section.dayKey) ? null : section.daypart,
+      weekOf: section.weekOf,
+      beforeId: null,
+      atStart: false,
+    };
+  }
+  const quickWin = parseQuickWinDragId(landingId);
+  if (quickWin) {
+    if (quickWin.dayKey === 'gedaan') return { type: 'skip' };
+    return {
+      type: 'place',
+      dayKey: quickWin.dayKey,
+      daypart: null,
+      weekOf: quickWin.weekOf,
+      beforeId: null,
+      atStart: true,
+    };
+  }
+  const overTask = tasks.find((task) => task.id === landingId);
+  if (!overTask) return { type: 'skip' };
+  const host = bundles.find((item) => item.id !== bundleId && item.taskIds.includes(overTask.id));
+  const anchor = host
+    ? tasks
+        .filter((task) => host.taskIds.includes(task.id) && !task.done && !moving.has(task.id))
+        .sort((a, b) => a.rank - b.rank)[0]
+    : overTask;
+  if (!anchor) return { type: 'skip' };
+  return {
+    type: 'place',
+    dayKey: anchor.dayKey,
+    daypart: isBoardDayKey(anchor.dayKey) ? null : anchor.daypart,
+    weekOf: anchor.weekOf,
+    beforeId: anchor.id,
+    atStart: false,
+  };
+}
+
+/**
+ * Een labelblok is hoger dan één kaart. De standaard overlap-meting kiest dan
+ * de hele kolom, ook als de aanwijzer op een kaart staat. Voor een blok telt
+ * het kleinste doel onder de aanwijzer; losse kaarten blijven op overlap.
+ */
+export const boardCollision: CollisionDetection = (args) => {
+  if (parseLabelBundleDragId(String(args.active.id))) {
+    const hits = pointerWithin(args);
+    if (hits.length > 0) {
+      const areaOf = (id: string | number) => {
+        const rect = args.droppableRects.get(id);
+        return rect ? rect.width * rect.height : Number.POSITIVE_INFINITY;
+      };
+      return [...hits].sort((a, b) => areaOf(a.id) - areaOf(b.id));
+    }
+  }
+  return rectIntersection(args);
+};
+
+export function dragOverlay(
+  activeId: string,
+  tasks: Task[],
+  threshold: number,
+  bundles: readonly LabelBundle[] = [],
+): ActiveDrag | null {
   const qw = parseQuickWinDragId(activeId);
   if (qw) {
     return {
@@ -54,12 +170,28 @@ export function dragOverlay(activeId: string, tasks: Task[], threshold: number):
       tasks: quickWinsForDay(tasks, qw.dayKey, threshold, qw.weekOf),
     };
   }
+  const bundleId = parseLabelBundleDragId(activeId);
+  if (bundleId) {
+    const bundle = bundles.find((item) => item.id === bundleId);
+    if (!bundle) return null;
+    const members = tasks
+      .filter((task) => bundle.taskIds.includes(task.id) && !task.done)
+      .sort((a, b) => a.rank - b.rank);
+    return { type: 'label-bundle', bundle, tasks: members };
+  }
   const task = tasks.find((item) => item.id === activeId);
   return task ? { type: 'task', task } : null;
 }
 
 export function finishBoardDrop(activeId: string, overId: string, tasks: Task[], drag: ActiveDrag | null): void {
   const store = useBoardStore.getState();
+  const draggedBundle = parseLabelBundleDragId(activeId);
+  if (draggedBundle) {
+    const drop = resolveLabelBundleDrop(draggedBundle, overId, tasks, store.labelBundles);
+    if (drop.type === 'done') store.completeLabelBundle(draggedBundle);
+    else if (drop.type === 'place') store.moveLabelBundle(draggedBundle, drop);
+    return;
+  }
   const qw = parseQuickWinDragId(activeId);
   if (qw) {
     const target = targetOf(overId, tasks);
