@@ -13,14 +13,16 @@ import { WeekTray } from './WeekTray';
 import { QuickWinsCard } from './QuickWinsCard';
 import { FocusBar } from '@/components/focusbar/FocusBar';
 import { useBoardStore } from '@/stores/useBoardStore';
-import { useSettingsStore } from '@/stores/useSettingsStore';
+import { labelById, useSettingsStore } from '@/stores/useSettingsStore';
 import { useUiStore } from '@/stores/useUiStore';
 import { dayKeyFromDate, rollingBoardDates, todayISO } from '@/lib/dates';
 import { cn } from '@/lib/utils';
-import { dragOverlay, finishBoardDrop, type ActiveDrag } from './boardDrag';
-
+import { LabelBundleFrame } from './LabelBundleFrame';
+import { boardCollision, dragOverlay, finishBoardDrop, type ActiveDrag } from './boardDrag';
 export function Board() {
   const tasks = useBoardStore((s) => s.tasks);
+  const labelBundles = useBoardStore((s) => s.labelBundles);
+  const labelDefs = useSettingsStore((s) => s.settings.labels ?? []);
   const threshold = useSettingsStore((s) => s.settings.quickWinThresholdMin);
   const focusMode = useUiStore((s) => s.focusMode);
   const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
@@ -104,7 +106,7 @@ export function Board() {
   }, [focusMode, today]);
 
   function onDragStart(e: DragStartEvent) {
-    setActiveDrag(dragOverlay(String(e.active.id), tasks, threshold));
+    setActiveDrag(dragOverlay(String(e.active.id), tasks, threshold, labelBundles));
   }
 
   function onDragEnd(e: DragEndEvent) {
@@ -117,7 +119,7 @@ export function Board() {
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden">
       <FocusBar />
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={boardCollision} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="flex min-h-0 min-w-0 flex-1">
           <WeekTray />
           <div
@@ -145,6 +147,21 @@ export function Board() {
           {activeDrag?.type === 'task' ? (
             <div className={cn('rotate-2 opacity-95', focusMode ? 'w-[min(520px,100%)] max-w-[90vw]' : 'w-[248px]')}>
               <TaskCard task={activeDrag.task} sortable={false} />
+            </div>
+          ) : activeDrag?.type === 'label-bundle' ? (
+            <div className="w-[248px]">
+              <LabelBundleFrame
+                bundle={activeDrag.bundle}
+                tasks={activeDrag.tasks}
+                label={labelById(labelDefs, activeDrag.bundle.labelId)}
+                open
+                overlay
+                onToggle={() => {}}
+              >
+                {activeDrag.tasks.map((task) => (
+                  <TaskCard key={task.id} task={task} sortable={false} />
+                ))}
+              </LabelBundleFrame>
             </div>
           ) : activeDrag?.type === 'quickwin' ? (
             <div className="w-[248px]">

@@ -14,7 +14,7 @@ import {
 import { nextRank, prevRank, rankBetween, RANK_STEP, uid } from '@/lib/utils';
 import { QUADRANT_ORDER, quadrant } from '@/lib/priority';
 import { setLabelBundleCache, setQuickWinBundleCache } from '@/lib/db/bundleCache';
-import { detachTask, parseLabelBundles, sameLabelBundles, type LabelBundle } from '@/lib/labelBundle';
+import { detachTask, parseLabelBundles, sameLabelBundles, spliceBundle, type LabelBundle } from '@/lib/labelBundle';
 import { repairChecklist } from '@/lib/checklist';
 import { compareDayTasks, isClosingRitual } from '@/lib/closing';
 import { reconcileSportSessions } from '@/stores/useSportStore';
@@ -73,6 +73,22 @@ interface BoardState {
     index: number,
     targetWeekOf?: string,
   ) => void;
+  /**
+   * Verplaats alle open taken van een labelbundel als één blok.
+   * `beforeId` null = achteraan de kolom. `atStart` zet het blok bovenaan.
+   */
+  moveLabelBundle: (
+    bundleId: string,
+    target: {
+      dayKey: DayKey;
+      daypart: Daypart | null;
+      weekOf: string;
+      beforeId: string | null;
+      atStart: boolean;
+    },
+  ) => void;
+  /** Vink alle open taken van een labelbundel af (drop op Gedaan). */
+  completeLabelBundle: (bundleId: string) => void;
   /** Verplaats alle QuickWin-taken van een dagbundel naar een andere dag. */
   moveQuickWinBundle: (
     fromDayKey: DayKey,
@@ -315,6 +331,92 @@ export const useBoardStore = create<BoardState>()(
         set({ tasks: next });
         const changed = next.filter((t) => patches.has(t.id));
         syncTasks(changed, prev, () => set({ tasks: prev }));
+      },
+
+      completeLabelBundle: (bundleId) => {
+        const state = get();
+        const bundle = state.labelBundles.find((item) => item.id === bundleId);
+        if (!bundle) return;
+        const ids = new Set(bundle.taskIds);
+        const prev = state.tasks;
+        const now = new Date().toISOString();
+        const changed = new Set<string>();
+        const next = prev.map((task) => {
+          if (!ids.has(task.id) || task.done) return task;
+          changed.add(task.id);
+          return touch({ ...task, done: true, completedAt: now });
+        });
+        if (changed.size === 0) return;
+        set({ tasks: next });
+        syncTasks(
+          next.filter((task) => changed.has(task.id)),
+          prev,
+          () => set({ tasks: prev }),
+        );
+      },
+
+      moveLabelBundle: (bundleId, target) => {
+        const state = get();
+        const bundle = state.labelBundles.find((item) => item.id === bundleId);
+        if (!bundle) return;
+        const moving = state.tasks
+          .filter((task) => bundle.taskIds.includes(task.id) && !task.done)
+          .sort(compareDayTasks);
+        if (moving.length === 0) return;
+        if (target.dayKey === 'gedaan') {
+          get().completeLabelBundle(bundleId);
+          return;
+        }
+
+        const movingIds = new Set(moving.map((task) => task.id));
+        const flat = isBoardDayKey(target.dayKey);
+        const week = flat ? target.weekOf : weekOf();
+        const daypart = flat ? null : target.daypart;
+        const inColumn = (task: Task, includeMoving: boolean): boolean => {
+          if (task.done || task.dayKey !== target.dayKey) return false;
+          if (!includeMoving && movingIds.has(task.id)) return false;
+          if (flat) return task.weekOf === week;
+          return task.daypart === daypart;
+        };
+        const siblings = state.tasks.filter((task) => inColumn(task, false)).sort(compareDayTasks);
+        const beforeId = target.atStart ? (siblings[0]?.id ?? null) : target.beforeId;
+        const orderedIds = spliceBundle(
+          siblings.map((task) => task.id),
+          moving.map((task) => task.id),
+          beforeId,
+        );
+        const currentIds = state.tasks
+          .filter((task) => inColumn(task, true) || (movingIds.has(task.id) && !task.done))
+          .sort(compareDayTasks)
+          .map((task) => task.id);
+        const sameDay = moving.every(
+          (task) => task.dayKey === target.dayKey && (flat ? task.weekOf === week : task.daypart === daypart),
+        );
+        if (sameDay && currentIds.join('\0') === orderedIds.join('\0')) return;
+
+        const byId = new Map(state.tasks.map((task) => [task.id, task]));
+        const ordered = orderedIds.flatMap((id) => {
+          const task = byId.get(id);
+          return task ? [task] : [];
+        });
+        const patches = new Map<string, Partial<Task>>();
+        ordered.forEach((task, index) => {
+          const moved = movingIds.has(task.id);
+          patches.set(task.id, {
+            rank: (index + 1) * RANK_STEP,
+            ...(moved ? { dayKey: target.dayKey, daypart, weekOf: week } : {}),
+          });
+        });
+        const prev = state.tasks;
+        const next = prev.map((task) =>
+          patches.has(task.id) ? touch({ ...task, ...patches.get(task.id) }) : task,
+        );
+        set({ tasks: next });
+        syncTasks(
+          next.filter((task) => patches.has(task.id)),
+          prev,
+          () => set({ tasks: prev }),
+        );
       },
 
       moveQuickWinBundle: (fromDayKey, fromWeekOf, toDayKey, toWeekOf) => {

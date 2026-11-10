@@ -3,6 +3,9 @@ import {
   blocksForTasks,
   bundleDropId,
   bundlePair,
+  labelBundleDragId,
+  parseLabelBundleDragId,
+  spliceBundle,
   detachTask,
   joinBundle,
   planDrop,
@@ -81,6 +84,32 @@ describe('labelbundels', () => {
     });
     const joined = joinBundle(bundles, 'b1', 'mail');
     expect(joined.find((bundle) => bundle.id === 'b1')?.taskIds).toEqual(['mediteren', 'sport', 'mail']);
+  });
+
+  it('zet een bundel als één blok voor of achter een andere kaart', () => {
+    expect(spliceBundle(['mail', 'bel'], ['mediteren', 'sport'], 'bel')).toEqual([
+      'mail',
+      'mediteren',
+      'sport',
+      'bel',
+    ]);
+    expect(spliceBundle(['mail'], ['mediteren', 'sport'], null)).toEqual([
+      'mail',
+      'mediteren',
+      'sport',
+    ]);
+    expect(spliceBundle(['mail', 'bel'], ['mediteren', 'sport'], 'mail')).toEqual([
+      'mediteren',
+      'sport',
+      'mail',
+      'bel',
+    ]);
+  });
+
+  it('houdt het sleep-id van de kop los van de drop-zone', () => {
+    expect(parseLabelBundleDragId(labelBundleDragId('b1'))).toBe('b1');
+    expect(parseLabelBundleDragId(bundleDropId('b1'))).toBeNull();
+    expect(bundleDropId('b1').startsWith('lbm:')).toBe(false);
   });
 
   it('maakt een doorzichtige tint van de labelkleur', () => {

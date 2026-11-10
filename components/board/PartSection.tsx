@@ -7,28 +7,8 @@ import type { DayKey, Daypart, Task } from '@/lib/types';
 import { TaskStack } from './TaskStack';
 import { AddTaskInline } from './AddTaskInline';
 import { DAYPART_LABELS, weekOf } from '@/lib/dates';
+import { sectionId } from '@/lib/sectionDrop';
 import { cn, formatMinutes } from '@/lib/utils';
-
-/** Drop-zone id: `sec:dayKey:weekOf:daypart`. */
-export function sectionId(
-  dayKey: DayKey,
-  daypart: Daypart | null,
-  columnWeekOf: string = weekOf(),
-): string {
-  return `sec:${dayKey}:${columnWeekOf}:${daypart ?? 'none'}`;
-}
-
-export function parseSectionId(
-  id: string,
-): { dayKey: DayKey; daypart: Daypart | null; weekOf: string } | null {
-  const m = id.match(/^sec:([^:]+):(\d{4}-\d{2}-\d{2}):([^:]+)$/);
-  if (!m) return null;
-  return {
-    dayKey: m[1] as DayKey,
-    weekOf: m[2],
-    daypart: m[3] === 'none' ? null : (m[3] as Daypart),
-  };
-}
 
 /**
  * Eén dagdeel-sectie: drop-zone + sorteerbare lijst.
