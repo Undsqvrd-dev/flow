@@ -18,6 +18,8 @@ import { reconcileSportSessions } from '@/stores/useSportStore';
 import { applyUpsert } from '@/lib/db/applyRemote';
 import { syncEnabled } from '@/lib/db/enabled';
 import { rememberTask, taskDirtyIds } from '@/lib/db/liveSync';
+import { deleteTask } from '@/lib/db/sync';
+import { isRitualSkipped, refreshRitualSkips } from '@/lib/ritualSkip';
 import { createClient } from '@/lib/supabase/client';
 import { taskFromRow, type TaskRow } from '@/lib/supabase/mappers';
 import { useBoardStore } from '@/stores/useBoardStore';
@@ -51,7 +53,24 @@ export async function ensureTodayMeditation(date = todayISO()): Promise<void> {
   applyRitualRow(data);
 }
 
+function dropSkippedRituals(): void {
+  const state = useBoardStore.getState();
+  const skipped = state.tasks.filter((task) => isRitualSkipped(task.ritualKey));
+  if (skipped.length === 0) return;
+  useBoardStore.setState({
+    tasks: state.tasks.filter((task) => !isRitualSkipped(task.ritualKey)),
+  });
+  if (!syncEnabled()) return;
+  for (const task of skipped) void deleteTask(task.id).catch(() => {});
+}
+
 function applyRitualRow(row: Record<string, unknown>): void {
+  const key = typeof row.ritual_key === 'string' ? row.ritual_key : null;
+  if (isRitualSkipped(key)) {
+    const id = typeof row.id === 'string' ? row.id : null;
+    if (id && syncEnabled()) void deleteTask(id).catch(() => {});
+    return;
+  }
   const task = taskFromRow(row as unknown as TaskRow);
   const state = useBoardStore.getState();
   const next = applyUpsert(state.tasks, task, (item) => item.id, taskDirtyIds());
@@ -67,6 +86,8 @@ function applyRitualRow(row: Record<string, unknown>): void {
 export async function ensureTodayRituals(date = todayISO()): Promise<void> {
   try {
     if (!syncEnabled()) return;
+    await refreshRitualSkips();
+    dropSkippedRituals();
     const supabase = createClient();
     const { data, error } = await supabase.rpc('ensure_daily_rituals', { p_date: date });
     if (error) {
@@ -141,6 +162,7 @@ function ensureLocalSportTask(date: string): void {
   const dayKey = dayKeyFromDate(day);
   const week = weekOf(day);
   const tasks = useBoardStore.getState().tasks;
+  if (isRitualSkipped(key)) return;
   const exists = tasks.some(
     (task) => task.ritualKey === key || (task.title === SPORT_TITLE && task.dayKey === dayKey && task.weekOf === week),
   );
