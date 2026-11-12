@@ -36,16 +36,30 @@ export function syncTasks(tasks: Task[], previous: readonly Task[], rollback: ()
   enqueueTasks(tasks, previous, rollback);
 }
 
-export function syncRemoveTask(id: string, rollback: () => void): void {
+export function syncRemoveTask(
+  id: string,
+  rollback: () => void,
+  onDeleted?: () => Promise<void> | void,
+): void {
   if (!syncEnabled()) return;
   forgetTask(id);
-  runSync(() => deleteTask(id), rollback);
+  runSync(async () => {
+    await deleteTask(id);
+    await onDeleted?.();
+  }, rollback);
 }
 
-export function syncRemoveTasks(ids: string[], rollback: () => void): void {
+export function syncRemoveTasks(
+  ids: string[],
+  rollback: () => void,
+  onDeleted?: () => Promise<void> | void,
+): void {
   if (!syncEnabled()) return;
   for (const id of ids) forgetTask(id);
-  runSync(() => deleteTasks(ids), rollback);
+  runSync(async () => {
+    await deleteTasks(ids);
+    await onDeleted?.();
+  }, rollback);
 }
 
 export function syncGoals(goals: Goal[], previous: readonly Goal[], rollback: () => void): void {

@@ -15,6 +15,7 @@ import { nextRank, prevRank, rankBetween, RANK_STEP, uid } from '@/lib/utils';
 import { QUADRANT_ORDER, quadrant } from '@/lib/priority';
 import { setLabelBundleCache, setQuickWinBundleCache } from '@/lib/db/bundleCache';
 import { detachTask, parseLabelBundles, sameLabelBundles, spliceBundle, type LabelBundle } from '@/lib/labelBundle';
+import { forgetRitualSkip, recordRitualSkip, rememberRitualSkip } from '@/lib/ritualSkip';
 import { repairChecklist } from '@/lib/checklist';
 import { compareDayTasks, isClosingRitual } from '@/lib/closing';
 import { reconcileSportSessions } from '@/stores/useSportStore';
@@ -239,13 +240,18 @@ export const useBoardStore = create<BoardState>()(
       removeTask: (id) => {
         const prev = get().tasks;
         const prevBundles = get().labelBundles;
+        const ritualKey = prev.find((task) => task.id === id)?.ritualKey ?? null;
+        if (ritualKey) rememberRitualSkip(ritualKey);
         const member = prevBundles.some((bundle) => bundle.taskIds.includes(id));
         const nextBundles = member ? detachTask(prevBundles, id) : prevBundles;
         set({ tasks: prev.filter((t) => t.id !== id), labelBundles: nextBundles });
         if (member) setLabelBundleCache(nextBundles);
         syncRemoveTask(id, () => {
+          if (ritualKey) forgetRitualSkip(ritualKey);
           set({ tasks: prev, labelBundles: prevBundles });
           if (member) setLabelBundleCache(prevBundles);
+        }, () => {
+          if (ritualKey) return recordRitualSkip(ritualKey);
         });
         if (member) {
           syncSettingsData(useSettingsStore.getState().settings, get().quickWinBundles, () => {
@@ -637,6 +643,8 @@ export const useBoardStore = create<BoardState>()(
         if (!removed.length) return;
 
         const removedIds = new Set(removed.map((t) => t.id));
+        const ritualKeys = removed.flatMap((task) => (task.ritualKey ? [task.ritualKey] : []));
+        for (const key of ritualKeys) rememberRitualSkip(key);
         const week = columnWeekOf ?? weekOf();
         const prevSnapshots = get().sortSnapshots;
         const nextSnapshots = { ...prevSnapshots };
@@ -646,9 +654,12 @@ export const useBoardStore = create<BoardState>()(
           tasks: prev.filter((t) => !removedIds.has(t.id)),
           sortSnapshots: nextSnapshots,
         });
-        syncRemoveTasks([...removedIds], () =>
-          set({ tasks: prev, sortSnapshots: prevSnapshots }),
-        );
+        syncRemoveTasks([...removedIds], () => {
+          for (const key of ritualKeys) forgetRitualSkip(key);
+          set({ tasks: prev, sortSnapshots: prevSnapshots });
+        }, async () => {
+          for (const key of ritualKeys) await recordRitualSkip(key);
+        });
       },
 
       closeDay: (date, reflection = null) => {

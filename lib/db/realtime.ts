@@ -41,6 +41,7 @@ import { useBoardStore } from '@/stores/useBoardStore';
 import { useGoalsStore } from '@/stores/useGoalsStore';
 import { useFocusStore } from '@/stores/useFocusStore';
 import { usePomodoroStore } from '@/stores/usePomodoroStore';
+import { isRitualSkipped } from '@/lib/ritualSkip';
 import { reconcileSportSessions, useSportStore } from '@/stores/useSportStore';
 
 interface RealtimePayload {
@@ -67,6 +68,7 @@ function handleTaskChange(payload: RealtimePayload): void {
     return;
   }
   const task = taskFromRow(payload.new as unknown as TaskRow);
+  if (isRitualSkipped(task.ritualKey)) return;
   const applied = applyUpsert(state.tasks, task, (item) => item.id, taskDirtyIds());
   const repaired = repairTaskChecklists(applied);
   if (repaired.changed || applied !== state.tasks) {

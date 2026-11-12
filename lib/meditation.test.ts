@@ -50,6 +50,14 @@ describe('meditatie', () => {
     expect(stats).toEqual({ current: 2, longest: 2 });
   });
 
+  it('telt een verwijderde dag als niet gedaan en laat gisteren staan', () => {
+    const stats = meditationStreak(
+      [med('2026-10-17', true), med('2026-10-18', true)],
+      TODAY,
+    );
+    expect(stats).toEqual({ current: 2, longest: 2 });
+  });
+
   it('telt vandaag mee zodra de taak afgevinkt is', () => {
     const stats = meditationStreak(
       [med('2026-10-18', true), med(TODAY, true)],
