@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Copy, Play, Trash2, Archive } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -37,6 +37,46 @@ function CardLabels({ taskLabels }: { taskLabels: string[] }) {
         </span>
       ))}
     </div>
+  );
+}
+
+/** Titel van de kaart: groeit mee, ook bij lange woorden. Enter voegt geen regel toe. */
+function CardTitle({
+  value,
+  done,
+  onChange,
+}: {
+  value: string;
+  done: boolean;
+  onChange: (value: string) => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  function resize(el: HTMLTextAreaElement) {
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }
+
+  useLayoutEffect(() => {
+    if (ref.current) resize(ref.current);
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      aria-label="Titel"
+      onChange={(e) => onChange(e.target.value.replace(/[\r\n]+/g, ''))}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.preventDefault();
+      }}
+      style={{ overflowWrap: 'anywhere' }}
+      className={cn(
+        'min-w-0 w-full flex-1 resize-none border-0 bg-transparent p-0 text-[20px] font-bold leading-snug text-txt outline-none break-words',
+        done && 'text-muted line-through',
+      )}
+    />
   );
 }
 
@@ -99,13 +139,10 @@ export function CardModal() {
                 className="mt-1.5 h-4.5 w-4.5 shrink-0 cursor-pointer accent-(--green)"
                 aria-label="Taak afvinken"
               />
-              <input
+              <CardTitle
                 value={t.title}
-                onChange={(e) => updateTask(t.id, { title: e.target.value })}
-                className={cn(
-                  'min-w-0 flex-1 bg-transparent text-[20px] font-bold text-txt outline-none',
-                  t.done && 'text-muted line-through',
-                )}
+                done={t.done}
+                onChange={(title) => updateTask(t.id, { title })}
               />
               {meditationDate(t) && (
                 <span className="mt-2">
