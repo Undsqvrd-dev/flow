@@ -11,7 +11,6 @@ import { useUiStore } from '@/stores/useUiStore';
 import { MeditationStreakMark } from './MeditationStreakMark';
 import { quickWinDragId } from '@/lib/quickWinDrag';
 import { weekOf } from '@/lib/dates';
-import { meditationDate } from '@/lib/meditation';
 import { cn } from '@/lib/utils';
 
 /**
@@ -106,7 +105,7 @@ export function QuickWinsCard({
                 >
                   {t.title}
                 </button>
-                {meditationDate(t) && <MeditationStreakMark ritualKey={t.ritualKey} />}
+                <MeditationStreakMark ritualKey={t.ritualKey} />
                 <span className="text-[10px] tabular-nums text-muted-2">{t.estimateMin}m</span>
               </li>
             ))}

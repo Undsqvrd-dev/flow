@@ -12,13 +12,23 @@ export function shiftISO(dateISO: string, days: number): string {
   return format(addDays(parseISO(dateISO), days), 'yyyy-MM-dd');
 }
 
-/** Kalenderdag van een meditatietaak, of null als het geen ritueel is. */
-export function meditationDate(task: Pick<Task, 'ritualKey'>): string | null {
+function ritualHead(prefix: string): string {
+  return prefix.endsWith(':') ? prefix : `${prefix}:`;
+}
+
+/** Kalenderdag van een ritueel met dit voorvoegsel, of null. */
+export function ritualDate(task: Pick<Task, 'ritualKey'>, prefix: string): string | null {
   const key = task.ritualKey;
-  if (!key?.startsWith(MEDITATION_RITUAL_PREFIX)) return null;
-  const date = key.slice(MEDITATION_RITUAL_PREFIX.length);
+  const head = ritualHead(prefix);
+  if (!key?.startsWith(head)) return null;
+  const date = key.slice(head.length);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   return date;
+}
+
+/** Kalenderdag van een meditatietaak, of null als het geen ritueel is. */
+export function meditationDate(task: Pick<Task, 'ritualKey'>): string | null {
+  return ritualDate(task, MEDITATION_RITUAL_PREFIX);
 }
 
 export interface MeditationStreak {
@@ -27,17 +37,18 @@ export interface MeditationStreak {
 }
 
 /**
- * Huidige reeks aaneengesloten dagen waarop Mediteren is afgevinkt.
+ * Aaneengesloten dagen waarop dit ritueel is afgevinkt.
  * Vandaag telt mee zodra de taak af is. Is vandaag nog open, dan loopt de
- * reeks door tot en met gisteren.
+ * reeks door tot en met gisteren. Een ontbrekende dag breekt de reeks.
  */
-export function meditationStreak(
+export function ritualStreak(
   tasks: readonly Pick<Task, 'ritualKey' | 'done'>[],
+  prefix: string,
   today: string,
 ): MeditationStreak {
   const done = new Set<string>();
   for (const task of tasks) {
-    const date = meditationDate(task);
+    const date = ritualDate(task, prefix);
     if (!date || !task.done || date > today) continue;
     done.add(date);
   }
@@ -65,4 +76,11 @@ export function meditationStreak(
   }
 
   return { current, longest };
+}
+
+export function meditationStreak(
+  tasks: readonly Pick<Task, 'ritualKey' | 'done'>[],
+  today: string,
+): MeditationStreak {
+  return ritualStreak(tasks, MEDITATION_RITUAL_PREFIX, today);
 }

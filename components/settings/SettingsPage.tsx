@@ -16,6 +16,7 @@ import { uid, cn } from '@/lib/utils';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { SignOutButton } from '@/components/auth/SignOutButton';
 import { MoodboardEditor } from '@/components/settings/MoodboardEditor';
+import { RecurringTasksPanel } from '@/components/settings/RecurringTasksPanel';
 import { forcePushLocalToRemote } from '@/lib/db/bootstrap';
 import { syncEnabled } from '@/lib/db/enabled';
 import type { Settings } from '@/lib/types';
@@ -281,6 +282,8 @@ export function SettingsPage() {
         <Panel title="Sport">
           <NumberField label="Weekdoel (sessies)" value={settings.sportWeeklyTarget} onChange={(v) => update({ sportWeeklyTarget: v })} />
         </Panel>
+
+        <RecurringTasksPanel />
 
         <Panel title="Labels">
           <LabelsEditor />

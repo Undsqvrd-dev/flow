@@ -17,6 +17,9 @@ import { useSettingsStore } from '@/stores/useSettingsStore';
 import { reconcileSportSessions } from '@/stores/useSportStore';
 import { applyUpsert } from '@/lib/db/applyRemote';
 import { syncEnabled } from '@/lib/db/enabled';
+import { dropLocalStaleCards, ensureBuiltinRecurring } from '@/lib/db/recurring';
+import { shouldEnsureLocalSport } from '@/lib/recurring';
+import { useRecurringStore } from '@/stores/useRecurringStore';
 import { rememberTask, taskDirtyIds } from '@/lib/db/liveSync';
 import { deleteTask } from '@/lib/db/sync';
 import { isRitualSkipped, refreshRitualSkips } from '@/lib/ritualSkip';
@@ -88,6 +91,7 @@ export async function ensureTodayRituals(date = todayISO()): Promise<void> {
     if (!syncEnabled()) return;
     await refreshRitualSkips();
     dropSkippedRituals();
+    await ensureBuiltinRecurring();
     const supabase = createClient();
     const { data, error } = await supabase.rpc('ensure_daily_rituals', { p_date: date });
     if (error) {
@@ -106,6 +110,7 @@ export async function ensureTodayRituals(date = todayISO()): Promise<void> {
     for (const row of rows) {
       if (isRecord(row)) applyRitualRow(row);
     }
+    dropLocalStaleCards(date);
   } finally {
     ensureLocalSportTask(date);
     ensureSportMeditationBundle(date);
@@ -163,6 +168,8 @@ function ensureLocalSportTask(date: string): void {
   const week = weekOf(day);
   const tasks = useBoardStore.getState().tasks;
   if (isRitualSkipped(key)) return;
+  const routines = useRecurringStore.getState();
+  if (!shouldEnsureLocalSport(routines.status, routines.items, date)) return;
   const exists = tasks.some(
     (task) => task.ritualKey === key || (task.title === SPORT_TITLE && task.dayKey === dayKey && task.weekOf === week),
   );

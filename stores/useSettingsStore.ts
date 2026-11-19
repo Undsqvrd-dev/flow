@@ -10,7 +10,7 @@ import { syncSettingsData } from '@/lib/db/storeSync';
 interface SettingsState {
   settings: Settings;
   update: (patch: Partial<Settings>) => void;
-  addLabel: (name: string, color: string) => void;
+  addLabel: (name: string, color: string) => string;
   updateLabel: (id: string, patch: Partial<Pick<LabelDef, 'name' | 'color'>>) => void;
   removeLabel: (id: string) => void;
 }
@@ -28,15 +28,17 @@ export const useSettingsStore = create<SettingsState>()(
       },
       addLabel: (name, color) => {
         const prev = get().settings;
+        const id = uid();
         set({
           settings: {
             ...prev,
-            labels: [...prev.labels, { id: uid(), name, color }],
+            labels: [...prev.labels, { id, name, color }],
           },
         });
         syncSettingsData(get().settings, getQuickWinBundleCache(), () =>
           set({ settings: prev }),
         );
+        return id;
       },
       updateLabel: (id, patch) => {
         const prev = get().settings;

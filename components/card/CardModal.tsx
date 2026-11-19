@@ -15,7 +15,6 @@ import { usePomodoroStore } from '@/stores/usePomodoroStore';
 import { useUiStore } from '@/stores/useUiStore';
 import { MeditationStreakMark } from '@/components/board/MeditationStreakMark';
 import { DAY_LABELS } from '@/lib/dates';
-import { meditationDate } from '@/lib/meditation';
 import { cn, formatMinutes } from '@/lib/utils';
 
 function CardLabels({ taskLabels }: { taskLabels: string[] }) {
@@ -144,11 +143,7 @@ export function CardModal() {
                 done={t.done}
                 onChange={(title) => updateTask(t.id, { title })}
               />
-              {meditationDate(t) && (
-                <span className="mt-2">
-                  <MeditationStreakMark ritualKey={t.ritualKey} />
-                </span>
-              )}
+              <MeditationStreakMark ritualKey={t.ritualKey} className="mt-2" />
             </div>
             <p className="mb-5 mt-1 pl-7 text-[12px] text-muted">{location}</p>
 
