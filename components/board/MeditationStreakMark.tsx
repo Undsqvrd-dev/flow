@@ -1,25 +1,46 @@
 'use client';
 
 import { Zap } from 'lucide-react';
-import { meditationDate, meditationStreak } from '@/lib/meditation';
+import { ritualStreak } from '@/lib/meditation';
+import { ritualPrefixFromKey } from '@/lib/recurring';
 import { useTodayISO } from '@/lib/useTodayISO';
+import { cn } from '@/lib/utils';
 import { useBoardStore } from '@/stores/useBoardStore';
+import { useRecurringStore } from '@/stores/useRecurringStore';
 
 /**
- * Bliksem + huidige meditatie-streak.
- * Alleen voor ritual_key `mediteren:…`, dezelfde berekening als de dashboardtegel.
+ * Bliksem + huidige streak.
+ * Mediteren houdt de bestaande berekening. Andere routines tonen hem alleen
+ * als streak aan staat. Zolang de routinelijst nog niet geladen is, blijft
+ * het bliksem voor Mediteren zichtbaar.
  */
-export function MeditationStreakMark({ ritualKey }: { ritualKey?: string | null }) {
+export function MeditationStreakMark({
+  ritualKey,
+  className,
+}: {
+  ritualKey?: string | null;
+  className?: string;
+}) {
   const today = useTodayISO();
-  const current = useBoardStore((s) => meditationStreak(s.tasks, today).current);
-  if (!meditationDate({ ritualKey })) return null;
+  const prefix = ritualPrefixFromKey(ritualKey);
+  const status = useRecurringStore((s) => s.status);
+  const routine = useRecurringStore((s) =>
+    prefix ? s.items.find((item) => item.ritualPrefix === prefix) : undefined,
+  );
+  const enabled = prefix != null && (routine ? routine.streak : status !== 'ready' && prefix === 'mediteren');
+  const current = useBoardStore((s) => (prefix ? ritualStreak(s.tasks, prefix, today).current : 0));
+  if (!enabled || !prefix) return null;
 
-  const label = `Meditatie streak: ${current} ${current === 1 ? 'dag' : 'dagen'}`;
+  const name = prefix === 'mediteren' ? 'Meditatie streak' : 'Streak';
+  const label = `${name}: ${current} ${current === 1 ? 'dag' : 'dagen'}`;
 
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-0.5 rounded-pill bg-green-50 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums leading-none text-green"
-      title="Meditatie streak"
+      className={cn(
+        'inline-flex shrink-0 items-center gap-0.5 rounded-pill bg-green-50 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums leading-none text-green',
+        className,
+      )}
+      title={name}
       aria-label={label}
     >
       <Zap size={11} strokeWidth={2.25} aria-hidden />
