@@ -1,4 +1,5 @@
 import { pointerWithin, rectIntersection, type CollisionDetection } from '@dnd-kit/core';
+import type { CalendarEvent } from '@/stores/useCalendarStore';
 import type { DayKey, Daypart, Task } from '@/lib/types';
 import { isBoardDayKey } from '@/lib/dates';
 import {
@@ -10,6 +11,7 @@ import {
   planDrop,
   type LabelBundle,
 } from '@/lib/labelBundle';
+import { tryCalendarReorder } from '@/lib/calendar/place';
 import { parseQuickWinDragId } from '@/lib/quickWinDrag';
 import { uid } from '@/lib/utils';
 import { openTasksFor, openTasksForDay, quickWinsForDay, useBoardStore } from '@/stores/useBoardStore';
@@ -17,6 +19,7 @@ import { parseSectionId } from '@/lib/sectionDrop';
 
 export type ActiveDrag =
   | { type: 'task'; task: Task }
+  | { type: 'agenda'; event: CalendarEvent }
   | { type: 'quickwin'; dayKey: DayKey; weekOf: string; tasks: Task[] }
   | { type: 'label-bundle'; bundle: LabelBundle; tasks: Task[] };
 
@@ -184,6 +187,7 @@ export function dragOverlay(
 }
 
 export function finishBoardDrop(activeId: string, overId: string, tasks: Task[], drag: ActiveDrag | null): void {
+  if (tryCalendarReorder(activeId, overId, tasks)) return;
   const store = useBoardStore.getState();
   const draggedBundle = parseLabelBundleDragId(activeId);
   if (draggedBundle) {

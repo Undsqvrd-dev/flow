@@ -3,7 +3,10 @@
 import { MoreHorizontal, Lock, LockOpen, ArrowRight, Eraser, Bell, Tag, Clock, Undo2 } from 'lucide-react';
 import { parseISO } from 'date-fns';
 import type { DayKey } from '@/lib/types';
-import { CalendarDayEvents } from './CalendarDayEvents';
+import { AllDayEvents } from './CalendarDayEvents';
+import { eventsOnDate } from '@/lib/calendar/events';
+import { useCalendarStore } from '@/stores/useCalendarStore';
+import { useUiStore } from '@/stores/useUiStore';
 import { PartSection } from './PartSection';
 import { TaskCard } from './TaskCard';
 import { QuickWinsBundlePrompt, QuickWinsCard } from './QuickWinsCard';
@@ -101,6 +104,8 @@ export function Column({
   const quickWinBundles = useBoardStore((s) => s.quickWinBundles);
   const closeDayFn = useBoardStore((s) => s.closeDay);
   const threshold = useSettingsStore((s) => s.settings.quickWinThresholdMin);
+  const showAppointments = useUiStore((s) => s.showAppointments);
+  const calendarEvents = useCalendarStore((s) => s.events);
 
   const isDayColumn = dayKey !== 'algemeen' && dayKey !== 'gedaan' && dayKey !== 'dump' && dayKey !== 'wachtruimte';
   const date = dateISOProp ? parseISO(dateISOProp) : null;
@@ -209,7 +214,7 @@ export function Column({
           />
         ) : dateISO ? (
           <>
-            <CalendarDayEvents dateISO={dateISO} />
+            {showAppointments && <AllDayEvents dateISO={dateISO} />}
             {quickWinsBundled && quickWins.length > 0 && (
               <QuickWinsCard
                 tasks={quickWins}
@@ -229,6 +234,7 @@ export function Column({
               daypart={null}
               weekOf={columnWeekOf}
               tasks={dayTasks}
+              events={showAppointments ? eventsOnDate(calendarEvents, dateISO).filter((event) => !event.allDay) : []}
               showHeader={false}
               showAdd
             />

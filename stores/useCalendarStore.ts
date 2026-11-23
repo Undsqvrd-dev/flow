@@ -16,6 +16,8 @@ export interface CalendarEvent {
   htmlLink: string | null;
   status: string;
   done: boolean;
+  /** Null = nog niet met de hand gezet, dus tijdsvolgorde. */
+  sortOrder: number | null;
   updatedAt: string;
 }
 
