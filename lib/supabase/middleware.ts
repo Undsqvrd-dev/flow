@@ -1,9 +1,11 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseEnv } from '@/lib/supabase/env';
+import { skipsAuth } from '@/lib/calendar/authPaths';
 
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (skipsAuth(pathname)) return NextResponse.next({ request });
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/auth');
 
   const env = getSupabaseEnv();

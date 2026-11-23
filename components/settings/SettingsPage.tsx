@@ -16,6 +16,7 @@ import { uid, cn } from '@/lib/utils';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { SignOutButton } from '@/components/auth/SignOutButton';
 import { MoodboardEditor } from '@/components/settings/MoodboardEditor';
+import { CalendarPanel } from '@/components/settings/CalendarPanel';
 import { RecurringTasksPanel } from '@/components/settings/RecurringTasksPanel';
 import { forcePushLocalToRemote } from '@/lib/db/bootstrap';
 import { syncEnabled } from '@/lib/db/enabled';
@@ -296,6 +297,8 @@ export function SettingsPage() {
         <Panel title="Migratie">
           <TrelloImport />
         </Panel>
+
+        <CalendarPanel />
 
         <Panel title="Cloud-sync">
           <SyncPanel />

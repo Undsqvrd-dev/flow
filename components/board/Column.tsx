@@ -3,6 +3,7 @@
 import { MoreHorizontal, Lock, LockOpen, ArrowRight, Eraser, Bell, Tag, Clock, Undo2 } from 'lucide-react';
 import { parseISO } from 'date-fns';
 import type { DayKey } from '@/lib/types';
+import { CalendarDayEvents } from './CalendarDayEvents';
 import { PartSection } from './PartSection';
 import { TaskCard } from './TaskCard';
 import { QuickWinsBundlePrompt, QuickWinsCard } from './QuickWinsCard';
@@ -208,6 +209,7 @@ export function Column({
           />
         ) : dateISO ? (
           <>
+            <CalendarDayEvents dateISO={dateISO} />
             {quickWinsBundled && quickWins.length > 0 && (
               <QuickWinsCard
                 tasks={quickWins}

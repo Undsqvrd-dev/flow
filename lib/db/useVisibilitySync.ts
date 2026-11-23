@@ -118,6 +118,9 @@ export function useVisibilitySync(): void {
         settings: { ...DEFAULT_SETTINGS, ...remote.settings },
       });
       await ensureTodayRituals();
+      const { loadCalendarEvents, syncCalendarIfStale } = await import('@/lib/calendar/client');
+      await loadCalendarEvents();
+      void syncCalendarIfStale();
 
       console.log('[flow sync] visibility refetch complete');
     } catch (err) {
@@ -125,6 +128,14 @@ export function useVisibilitySync(): void {
     } finally {
       isFetching.current = false;
     }
+  }, []);
+
+  useEffect(() => {
+    void import('@/lib/calendar/client').then(({ syncCalendarIfStale }) => syncCalendarIfStale());
+    const timer = window.setInterval(() => {
+      void import('@/lib/calendar/client').then(({ syncCalendarIfStale }) => syncCalendarIfStale());
+    }, 15 * 60 * 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
