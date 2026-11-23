@@ -1,5 +1,7 @@
 'use client';
 
+import { calendarEventFromRow } from '@/lib/calendar/client';
+import { useCalendarStore } from '@/stores/useCalendarStore';
 import { createClient } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
@@ -51,6 +53,7 @@ interface RealtimePayload {
 }
 
 let channel: RealtimeChannel | null = null;
+let calendarChannel: RealtimeChannel | null = null;
 let isSubscribed = false;
 
 function textField(row: Record<string, unknown>, key: string): string {
@@ -169,6 +172,31 @@ function handleSportChange(payload: RealtimePayload): void {
   rememberSport(session.id, session.updatedAt);
 }
 
+function handleCalendarChange(payload: RealtimePayload): void {
+  const state = useCalendarStore.getState();
+  if (payload.eventType === 'DELETE') {
+    const id = textField(payload.old, 'id');
+    useCalendarStore.setState({ events: state.events.filter((event) => event.id !== id) });
+    return;
+  }
+  const event = calendarEventFromRow(payload.new);
+  useCalendarStore.setState({
+    ready: true,
+    events: [...state.events.filter((item) => item.id !== event.id), event],
+  });
+}
+
+function subscribeToCalendarEvents(): void {
+  if (calendarChannel || typeof window === 'undefined') return;
+  const supabase = createClient();
+  calendarChannel = supabase
+    .channel('flow-calendar')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, handleCalendarChange)
+    .subscribe((status) => {
+      if (status === 'CHANNEL_ERROR') console.warn('[flow agenda] realtime niet beschikbaar');
+    });
+}
+
 export function subscribeToRealtime(): void {
   if (isSubscribed || typeof window === 'undefined') return;
 
@@ -220,6 +248,7 @@ export function subscribeToRealtime(): void {
         isSubscribed = false;
       }
     });
+  subscribeToCalendarEvents();
 }
 
 export function unsubscribeFromRealtime(): void {
@@ -228,6 +257,11 @@ export function unsubscribeFromRealtime(): void {
     void supabase.removeChannel(channel);
     channel = null;
     isSubscribed = false;
+  }
+  if (calendarChannel) {
+    const supabase = createClient();
+    void supabase.removeChannel(calendarChannel);
+    calendarChannel = null;
   }
 }
 

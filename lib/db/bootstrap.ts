@@ -35,6 +35,7 @@ import {
   rememberLifeRule,
   rememberValue,
 } from '@/lib/db/liveSync';
+import { loadCalendarEvents } from '@/lib/calendar/client';
 import { subscribeToRealtime } from '@/lib/db/realtime';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useFocusStore } from '@/stores/useFocusStore';
@@ -173,6 +174,7 @@ async function bootstrapOnce(): Promise<void> {
     markSyncReady(true);
     persistChecklistRepairs();
     subscribeToRealtime();
+    await loadCalendarEvents();
     await ensureTodayRituals();
     seedPersonalDirectionIfEmpty();
     return;
@@ -221,6 +223,7 @@ async function bootstrapOnce(): Promise<void> {
   persistChecklistRepairs();
 
   subscribeToRealtime();
+  await loadCalendarEvents();
   await ensureTodayRituals();
   seedPersonalDirectionIfEmpty();
 }
@@ -366,6 +369,7 @@ export async function forcePushLocalToRemote(): Promise<{ taskCount: number }> {
   markSyncReady(true);
   persistChecklistRepairs();
   subscribeToRealtime();
+  await loadCalendarEvents();
   await ensureTodayRituals();
   seedPersonalDirectionIfEmpty();
   return { taskCount: merged.tasks.length };

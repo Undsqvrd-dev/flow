@@ -118,6 +118,8 @@ export function useVisibilitySync(): void {
         settings: { ...DEFAULT_SETTINGS, ...remote.settings },
       });
       await ensureTodayRituals();
+      const { loadCalendarEvents } = await import('@/lib/calendar/client');
+      await loadCalendarEvents();
 
       console.log('[flow sync] visibility refetch complete');
     } catch (err) {
