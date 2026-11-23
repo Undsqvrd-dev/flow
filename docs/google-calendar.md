@@ -41,7 +41,9 @@ Lokaal testen mag een tweede redirect URI toevoegen, bijvoorbeeld `http://localh
 9. Deploy opnieuw, zodat de cron en de nieuwe routes live zijn.
 10. In Flow: **Instellingen → Koppel Google Agenda**. Log in als `steijn@facilityfinder.nl` en geef leestoegang. Een ander Google-account wordt geweigerd.
 
-Daarna haalt Vercel Cron (`vercel.json`, `*/15 * * * *`) deze week en volgende week op. **Nu synchroniseren** doet hetzelfde meteen. Op het Hobby-plan van Vercel mag een cron soms maar één keer per dag draaien; het schema vraagt elke 15 minuten. Lukt dat niet, dan blijft de knop werken.
+Vercel Cron staat in `vercel.json` op `0 6 * * *` (elke dag om 07:00 Nederlandse wintertijd). Een schema van elke 15 minuten wijst Vercel op het Hobby-plan af en laat de hele deploy falen. Staat het project op Pro, zet die regel dan op `*/15 * * * *`.
+
+Zolang Flow openstaat, vraagt de app zelf hooguit elke 15 minuten een sync aan. **Nu synchroniseren** doet het meteen.
 
 ## Wat er niet gebeurt
 

@@ -51,6 +51,36 @@ export async function loadCalendarEvents(): Promise<void> {
   }
 }
 
+const SYNC_STALE_MS = 15 * 60 * 1000;
+let calendarSyncing = false;
+let lastCalendarSyncAttempt = 0;
+
+export async function syncCalendarIfStale(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (calendarSyncing || Date.now() - lastCalendarSyncAttempt < SYNC_STALE_MS) return;
+  calendarSyncing = true;
+  lastCalendarSyncAttempt = Date.now();
+  try {
+    const statusResponse = await fetch('/api/calendar/status');
+    const statusText = await statusResponse.text();
+    let status: { connected?: boolean; lastSyncAt?: string | null } | null = null;
+    try {
+      status = statusText ? JSON.parse(statusText) as { connected?: boolean; lastSyncAt?: string | null } : null;
+    } catch {
+      status = null;
+    }
+    if (!statusResponse.ok || !status?.connected) return;
+    const lastSync = status.lastSyncAt ? Date.parse(status.lastSyncAt) : 0;
+    if (lastSync && Date.now() - lastSync < SYNC_STALE_MS) return;
+    const syncResponse = await fetch('/api/calendar/sync', { method: 'POST' });
+    if (syncResponse.ok) await loadCalendarEvents();
+  } catch (error) {
+    console.warn('[flow agenda] synchroniseren mislukt', error instanceof Error ? error.message : error);
+  } finally {
+    calendarSyncing = false;
+  }
+}
+
 export async function toggleCalendarEvent(id: string, done: boolean): Promise<void> {
   const previous = useCalendarStore.getState().events;
   useCalendarStore.setState({

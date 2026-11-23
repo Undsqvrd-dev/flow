@@ -105,5 +105,7 @@ describe('oauth en migratie', () => {
     expect(sql).toContain('calendar_events_lock_content');
     expect(sql).not.toMatch(/drop table tasks/i);
     expect(sql).toContain('refresh_token');
+    const vercel = JSON.parse(readFileSync('vercel.json', 'utf8')) as { crons: { path: string; schedule: string }[] };
+    expect(vercel.crons).toEqual([{ path: '/api/cron/calendar', schedule: '0 6 * * *' }]);
   });
 });
