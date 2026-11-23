@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Archive,
   Bell,
@@ -10,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { Task } from '@/lib/types';
+import { deleteMenuStep } from '@/lib/cardMenu';
 import {
   ContextMenuItem,
   ContextMenuSeparator,
@@ -41,6 +43,7 @@ export function TaskCardContextMenu({
   const duplicateTask = useBoardStore((s) => s.duplicateTask);
   const removeTask = useBoardStore((s) => s.removeTask);
   const labelDefs = useSettingsStore((s) => s.settings.labels ?? []);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   function run(action: () => void) {
     action();
@@ -73,6 +76,20 @@ export function TaskCardContextMenu({
       >
         <Bell size={14} strokeWidth={1.75} className={cn(task.urgent && 'fill-red text-red')} />
         {task.urgent ? 'Prioriteit uit' : 'Prioriteit aan'}
+      </ContextMenuItem>
+      <ContextMenuItem
+        danger
+        onSelect={() => {
+          const step = deleteMenuStep(confirmDelete);
+          if (!step.remove) {
+            setConfirmDelete(true);
+            return;
+          }
+          run(() => removeTask(task.id));
+        }}
+      >
+        <Trash2 size={14} strokeWidth={1.75} />
+        {confirmDelete ? 'Zeker weten?' : 'Verwijderen'}
       </ContextMenuItem>
 
       <ContextMenuSeparator />
@@ -165,9 +182,6 @@ export function TaskCardContextMenu({
         onSelect={() => run(() => updateTask(task.id, { dayKey: 'wachtruimte', daypart: null }))}
       >
         <Archive size={14} strokeWidth={1.75} /> Naar wachtruimte
-      </ContextMenuItem>
-      <ContextMenuItem danger onSelect={() => run(() => removeTask(task.id))}>
-        <Trash2 size={14} strokeWidth={1.75} /> Verwijderen
       </ContextMenuItem>
     </ContextMenuSurface>
   );
