@@ -8,7 +8,10 @@ import {
 import { parseISO } from 'date-fns';
 import type { DayKey } from '@/lib/types';
 import { Column } from './Column';
+import { CalendarEventCard } from './CalendarDayEvents';
 import { TaskCard } from './TaskCard';
+import { parseAgendaDragId } from '@/lib/calendar/order';
+import { useCalendarStore } from '@/stores/useCalendarStore';
 import { WeekTray } from './WeekTray';
 import { QuickWinsCard } from './QuickWinsCard';
 import { FocusBar } from '@/components/focusbar/FocusBar';
@@ -106,6 +109,12 @@ export function Board() {
   }, [focusMode, today]);
 
   function onDragStart(e: DragStartEvent) {
+    const eventId = parseAgendaDragId(String(e.active.id));
+    if (eventId) {
+      const event = useCalendarStore.getState().events.find((item) => item.id === eventId);
+      setActiveDrag(event ? { type: 'agenda', event } : null);
+      return;
+    }
     setActiveDrag(dragOverlay(String(e.active.id), tasks, threshold, labelBundles));
   }
 
@@ -144,7 +153,11 @@ export function Board() {
           </div>
         </div>
         <DragOverlay>
-          {activeDrag?.type === 'task' ? (
+          {activeDrag?.type === 'agenda' ? (
+            <div className={cn('rotate-2 opacity-95', focusMode ? 'w-[min(520px,100%)] max-w-[90vw]' : 'w-[248px]')}>
+              <CalendarEventCard event={activeDrag.event} />
+            </div>
+          ) : activeDrag?.type === 'task' ? (
             <div className={cn('rotate-2 opacity-95', focusMode ? 'w-[min(520px,100%)] max-w-[90vw]' : 'w-[248px]')}>
               <TaskCard task={activeDrag.task} sortable={false} />
             </div>

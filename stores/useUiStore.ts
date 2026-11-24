@@ -15,6 +15,8 @@ interface UiState {
   weekTrayOpen: boolean;
   /** Mobiel: volledige navigatie-drawer. Niet persistent. */
   mobileNavOpen: boolean;
+  /** Afspraken op het dag- en weekbord. Blijft staan na herladen. */
+  showAppointments: boolean;
 
   setQuickCaptureOpen: (v: boolean) => void;
   setNewTaskOpen: (v: boolean, dayKey?: DayKey | null) => void;
@@ -26,6 +28,7 @@ interface UiState {
   setWeekTrayOpen: (v: boolean) => void;
   toggleWeekTray: () => void;
   setMobileNavOpen: (v: boolean) => void;
+  toggleAppointments: () => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -39,6 +42,7 @@ export const useUiStore = create<UiState>()(
       sidebarCollapsed: false,
       weekTrayOpen: false,
       mobileNavOpen: false,
+      showAppointments: true,
 
       setQuickCaptureOpen: (v) => set({ quickCaptureOpen: v }),
       setNewTaskOpen: (v, dayKey) =>
@@ -51,10 +55,10 @@ export const useUiStore = create<UiState>()(
         }),
       openTask: (id) => set({ openTaskId: id }),
       setFocusMode: (v) =>
-        set((s) => ({
+        set({
           focusMode: v,
           ...(v ? { weekTrayOpen: false } : {}),
-        })),
+        }),
       toggleFocusMode: () =>
         set((s) => {
           const next = !s.focusMode;
@@ -68,12 +72,14 @@ export const useUiStore = create<UiState>()(
       setWeekTrayOpen: (v) => set({ weekTrayOpen: v }),
       toggleWeekTray: () => set((s) => ({ weekTrayOpen: !s.weekTrayOpen })),
       setMobileNavOpen: (v) => set({ mobileNavOpen: v }),
+      toggleAppointments: () => set((s) => ({ showAppointments: !s.showAppointments })),
     }),
     {
       name: 'flow-ui',
       partialize: (s) => ({
         sidebarCollapsed: s.sidebarCollapsed,
         weekTrayOpen: s.weekTrayOpen,
+        showAppointments: s.showAppointments,
       }),
     },
   ),

@@ -7,6 +7,9 @@ import type { DayKey, Daypart, Task } from '@/lib/types';
 import { blocksForTasks, sharedLabelId } from '@/lib/labelBundle';
 import { useBoardStore } from '@/stores/useBoardStore';
 import { useSettingsStore, labelById } from '@/stores/useSettingsStore';
+import { CalendarEventCard } from './CalendarDayEvents';
+import { mixedDayCards } from '@/lib/calendar/order';
+import type { CalendarEvent } from '@/stores/useCalendarStore';
 import { TaskCard } from './TaskCard';
 import { InsertTaskGap } from './InsertTaskGap';
 import { LabelBundleFrame } from './LabelBundleFrame';
@@ -87,11 +90,13 @@ export function TaskStack({
   dayKey,
   daypart,
   weekOf,
+  events = [],
 }: {
   tasks: Task[];
   dayKey: DayKey;
   daypart: Daypart | null;
   weekOf: string;
+  events?: CalendarEvent[];
 }) {
   const bundles = useBoardStore((s) => s.labelBundles);
   const labelDefs = useSettingsStore((s) => s.settings.labels ?? []);
@@ -123,27 +128,64 @@ export function TaskStack({
     );
   }
 
+  const blockList = (slice: Task[]) => (
+    slice.length === 0 ? null : (
+      dayKey === 'gedaan'
+        ? slice.map((task) => row(task))
+        : blocksForTasks(slice, bundles).map((block) => {
+            if (block.kind === 'task') return row(block.task);
+            const label = labelById(labelDefs, block.bundle.labelId);
+            const open = !closed[block.bundle.id];
+            return (
+              <LabelBundleFrame
+                key={block.bundle.id}
+                bundle={block.bundle}
+                tasks={block.tasks}
+                label={label}
+                open={open}
+                onToggle={() =>
+                  setClosed((current) => ({ ...current, [block.bundle.id]: !current[block.bundle.id] }))
+                }
+              >
+                {block.tasks.map((task) => row(task, block.bundle))}
+              </LabelBundleFrame>
+            );
+          })
+    )
+  );
+
+  if (events.length === 0) {
+    return (
+      <SortableContext items={visual.map((task) => task.id)} strategy={verticalListSortingStrategy}>
+        {blockList(tasks)}
+      </SortableContext>
+    );
+  }
+
+  const cards = mixedDayCards(tasks, events);
+  const groups: { key: string; tasks?: Task[]; event?: CalendarEvent }[] = [];
+  for (const card of cards) {
+    if (card.kind === 'event') {
+      groups.push({ key: card.id, event: card.event });
+      continue;
+    }
+    const last = groups[groups.length - 1];
+    if (last?.tasks) last.tasks.push(card.task);
+    else groups.push({ key: card.id, tasks: [card.task] });
+  }
+  const sortableIds = cards.map((card) => card.id);
+
   return (
-    <SortableContext items={visual.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-      {blocks.map((block) => {
-        if (block.kind === 'task') return row(block.task);
-        const label = labelById(labelDefs, block.bundle.labelId);
-        const open = !closed[block.bundle.id];
-        return (
-          <LabelBundleFrame
-            key={block.bundle.id}
-            bundle={block.bundle}
-            tasks={block.tasks}
-            label={label}
-            open={open}
-            onToggle={() =>
-              setClosed((current) => ({ ...current, [block.bundle.id]: !current[block.bundle.id] }))
-            }
-          >
-            {block.tasks.map((task) => row(task, block.bundle))}
-          </LabelBundleFrame>
-        );
-      })}
+    <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+      {groups.map((group) => (
+        group.event ? (
+          <CalendarEventCard key={group.key} event={group.event} sortable />
+        ) : (
+          <div key={group.key} className="flex flex-col gap-1.5">
+            {blockList(group.tasks ?? [])}
+          </div>
+        )
+      ))}
     </SortableContext>
   );
 }

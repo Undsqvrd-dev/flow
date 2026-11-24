@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Plus, Focus as FocusIcon, Lightbulb, Leaf, RefreshCw } from 'lucide-react';
+import { Plus, Focus as FocusIcon, Lightbulb, Leaf, RefreshCw, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { forcePushLocalToRemote } from '@/lib/db/bootstrap';
@@ -31,6 +31,9 @@ export function Topbar() {
   const setNewTaskOpen = useUiStore((s) => s.setNewTaskOpen);
   const setQuickCaptureOpen = useUiStore((s) => s.setQuickCaptureOpen);
   const setMobileNavOpen = useUiStore((s) => s.setMobileNavOpen);
+  const showAppointments = useUiStore((s) => s.showAppointments);
+  const toggleAppointments = useUiStore((s) => s.toggleAppointments);
+  const onBoard = pathname.startsWith('/board');
   const [todayLabel, setTodayLabel] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [syncHint, setSyncHint] = useState('Sync naar cloud');
@@ -83,6 +86,20 @@ export function Topbar() {
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {onBoard && (
+          <Tooltip content={showAppointments ? 'Afspraken verbergen' : 'Afspraken tonen'}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleAppointments}
+              aria-pressed={showAppointments}
+              aria-label={showAppointments ? 'Afspraken verbergen' : 'Afspraken tonen'}
+              className={cn(showAppointments && 'bg-amber/15 text-amber')}
+            >
+              <Calendar size={17} strokeWidth={1.75} />
+            </Button>
+          </Tooltip>
+        )}
         <Tooltip content={syncHint}>
           <Button
             variant="ghost"

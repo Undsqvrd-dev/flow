@@ -20,6 +20,11 @@ export function calendarEventFromRow(row: Record<string, unknown>): CalendarEven
     htmlLink: text(row.html_link),
     status: typeof row.status === 'string' ? row.status : 'confirmed',
     done: row.done === true,
+    sortOrder: typeof row.sort_order === 'number'
+      ? row.sort_order
+      : typeof row.sort_order === 'string' && row.sort_order !== ''
+        ? Number(row.sort_order)
+        : null,
     updatedAt: typeof row.updated_at === 'string' ? row.updated_at : '',
   };
 }
@@ -78,6 +83,28 @@ export async function syncCalendarIfStale(): Promise<void> {
     console.warn('[flow agenda] synchroniseren mislukt', error instanceof Error ? error.message : error);
   } finally {
     calendarSyncing = false;
+  }
+}
+
+export async function saveCalendarSortOrders(orders: { id: string; sortOrder: number }[]): Promise<void> {
+  if (orders.length === 0) return;
+  const previous = useCalendarStore.getState().events;
+  const nextOrder = new Map(orders.map((order) => [order.id, order.sortOrder]));
+  useCalendarStore.setState({
+    events: previous.map((event) => (
+      nextOrder.has(event.id) ? { ...event, sortOrder: nextOrder.get(event.id) ?? event.sortOrder } : event
+    )),
+  });
+  try {
+    const supabase = createClient();
+    const results = await Promise.all(orders.map((order) => (
+      supabase.from('calendar_events').update({ sort_order: order.sortOrder }).eq('id', order.id)
+    )));
+    const failed = results.find((result) => result.error);
+    if (failed?.error) throw failed.error;
+  } catch (error) {
+    useCalendarStore.setState({ events: previous });
+    console.warn('[flow agenda] volgorde opslaan mislukt', error instanceof Error ? error.message : error);
   }
 }
 

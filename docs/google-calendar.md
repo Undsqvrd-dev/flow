@@ -49,4 +49,5 @@ Zolang Flow openstaat, vraagt de app zelf hooguit elke 15 minuten een sync aan. 
 
 - Gewone taken worden niet aangemaakt, gewijzigd of verwijderd.
 - Afvinken gebeurt alleen in Flow (`done`) en gaat niet terug naar Google.
+- Verslepen op het bord zet `sort_order` (migratie `015_calendar_sort_order.sql`). De afspraak blijft op haar dag; de sync overschrijft die positie niet.
 - Het refresh-token gaat nooit naar de browser. De status komt uit `calendar_connection_status()`.

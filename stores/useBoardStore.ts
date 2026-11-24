@@ -74,6 +74,8 @@ interface BoardState {
     index: number,
     targetWeekOf?: string,
   ) => void;
+  /** Zet rangen (en eventueel de dag) na een gemengde volgorde met afspraken. */
+  placeTasks: (updates: { id: string; rank: number; dayKey?: DayKey; weekOf?: string }[]) => void;
   /**
    * Verplaats alle open taken van een labelbundel als één blok.
    * `beforeId` null = achteraan de kolom. `atStart` zet het blok bovenaan.
@@ -336,6 +338,27 @@ export const useBoardStore = create<BoardState>()(
         );
         set({ tasks: next });
         const changed = next.filter((t) => patches.has(t.id));
+        syncTasks(changed, prev, () => set({ tasks: prev }));
+      },
+
+      placeTasks: (updates) => {
+        if (updates.length === 0) return;
+        const prev = get().tasks;
+        const byId = new Map(updates.map((update) => [update.id, update]));
+        const next = prev.map((task) => {
+          const update = byId.get(task.id);
+          if (!update) return task;
+          const moved = Boolean(update.dayKey) && (update.dayKey !== task.dayKey || update.weekOf !== task.weekOf);
+          if (task.rank === update.rank && !moved) return task;
+          return touch({
+            ...task,
+            rank: update.rank,
+            ...(moved ? { dayKey: update.dayKey ?? task.dayKey, weekOf: update.weekOf ?? task.weekOf, daypart: null } : {}),
+          });
+        });
+        const changed = next.filter((task, index) => task !== prev[index]);
+        if (changed.length === 0) return;
+        set({ tasks: next });
         syncTasks(changed, prev, () => set({ tasks: prev }));
       },
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { ChevronDown } from 'lucide-react';
 import type { DayKey, Daypart, Task } from '@/lib/types';
+import type { CalendarEvent } from '@/stores/useCalendarStore';
 import { TaskStack } from './TaskStack';
 import { AddTaskInline } from './AddTaskInline';
 import { DAYPART_LABELS, weekOf } from '@/lib/dates';
@@ -21,6 +22,7 @@ export function PartSection({
   weekOf: columnWeekOf,
   showHeader = true,
   showAdd = true,
+  events = [],
   children,
 }: {
   dayKey: DayKey;
@@ -29,6 +31,7 @@ export function PartSection({
   weekOf?: string;
   showHeader?: boolean;
   showAdd?: boolean;
+  events?: CalendarEvent[];
   children?: React.ReactNode;
 }) {
   const columnWeek = columnWeekOf ?? weekOf();
@@ -83,7 +86,7 @@ export function PartSection({
           )}
         >
           {children}
-          <TaskStack tasks={tasks} dayKey={dayKey} daypart={daypart} weekOf={columnWeek} />
+          <TaskStack tasks={tasks} dayKey={dayKey} daypart={daypart} weekOf={columnWeek} events={events} />
           {showAdd && (
             <AddTaskInline dayKey={dayKey} daypart={daypart} weekOf={columnWeek} />
           )}
