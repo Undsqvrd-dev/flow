@@ -109,9 +109,15 @@ describe('positie overleeft de sync', () => {
     const sync = readFileSync('lib/calendar/syncJob.ts', 'utf8');
     const upsert = sync.slice(sync.indexOf('function toRow'), sync.indexOf('export async function syncCalendarUser'));
     expect(upsert).not.toContain('sort_order');
-    const sql = readFileSync('supabase/migrations/015_calendar_sort_order.sql', 'utf8');
-    expect(sql).toContain('add column if not exists sort_order');
-    expect(sql).not.toContain('NEW.sort_order := OLD.sort_order');
+    expect(upsert).not.toContain('dismissed_at');
+    expect(upsert).not.toContain('done:');
+    const sql = readFileSync('supabase/migrations/016_calendar_dismiss.sql', 'utf8');
+    expect(sql).toContain('dismissed_at timestamptz');
+    expect(sql).not.toContain('NEW.dismissed_at := OLD.dismissed_at');
+    expect(sql).not.toContain('NEW.done := OLD.done');
+    const orderSql = readFileSync('supabase/migrations/015_calendar_sort_order.sql', 'utf8');
+    expect(orderSql).toContain('add column if not exists sort_order');
+    expect(orderSql).not.toContain('NEW.sort_order := OLD.sort_order');
     expect(sql).toContain('NEW.title := OLD.title');
     expect(sql).not.toMatch(/drop table tasks/i);
   });

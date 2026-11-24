@@ -99,3 +99,14 @@ export function eventsOnDate<T extends { eventDate: string; endDate: string; sta
     (event) => event.status !== 'cancelled' && event.eventDate <= dateISO && dateISO < event.endDate,
   );
 }
+
+/** Zichtbaar op het dag- en weekbord. Afgevinkt of in Flow verborgen telt niet mee. */
+export function boardEventsOnDate<T extends {
+  eventDate: string;
+  endDate: string;
+  status: string;
+  done?: boolean;
+  dismissedAt?: string | null;
+}>(events: readonly T[], dateISO: string): T[] {
+  return eventsOnDate(events, dateISO).filter((event) => event.done !== true && !event.dismissedAt);
+}

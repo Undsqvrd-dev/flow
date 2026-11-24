@@ -4,7 +4,7 @@ import { MoreHorizontal, Lock, LockOpen, ArrowRight, Eraser, Bell, Tag, Clock, U
 import { parseISO } from 'date-fns';
 import type { DayKey } from '@/lib/types';
 import { AllDayEvents } from './CalendarDayEvents';
-import { eventsOnDate } from '@/lib/calendar/events';
+import { boardEventsOnDate } from '@/lib/calendar/events';
 import { useCalendarStore } from '@/stores/useCalendarStore';
 import { useUiStore } from '@/stores/useUiStore';
 import { PartSection } from './PartSection';
@@ -234,7 +234,7 @@ export function Column({
               daypart={null}
               weekOf={columnWeekOf}
               tasks={dayTasks}
-              events={showAppointments ? eventsOnDate(calendarEvents, dateISO).filter((event) => !event.allDay) : []}
+              events={showAppointments ? boardEventsOnDate(calendarEvents, dateISO).filter((event) => !event.allDay) : []}
               showHeader={false}
               showAdd
             />

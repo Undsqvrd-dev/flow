@@ -20,6 +20,7 @@ export function calendarEventFromRow(row: Record<string, unknown>): CalendarEven
     htmlLink: text(row.html_link),
     status: typeof row.status === 'string' ? row.status : 'confirmed',
     done: row.done === true,
+    dismissedAt: text(row.dismissed_at),
     sortOrder: typeof row.sort_order === 'number'
       ? row.sort_order
       : typeof row.sort_order === 'string' && row.sort_order !== ''
@@ -105,6 +106,22 @@ export async function saveCalendarSortOrders(orders: { id: string; sortOrder: nu
   } catch (error) {
     useCalendarStore.setState({ events: previous });
     console.warn('[flow agenda] volgorde opslaan mislukt', error instanceof Error ? error.message : error);
+  }
+}
+
+export async function dismissCalendarEvent(id: string): Promise<void> {
+  const previous = useCalendarStore.getState().events;
+  const dismissedAt = new Date().toISOString();
+  useCalendarStore.setState({
+    events: previous.map((event) => (event.id === id ? { ...event, dismissedAt } : event)),
+  });
+  try {
+    const supabase = createClient();
+    const { error } = await supabase.from('calendar_events').update({ dismissed_at: dismissedAt }).eq('id', id);
+    if (error) throw error;
+  } catch (error) {
+    useCalendarStore.setState({ events: previous });
+    console.warn('[flow agenda] verbergen mislukt', error instanceof Error ? error.message : error);
   }
 }
 

@@ -8,6 +8,7 @@ interface ConnectionRow {
   refresh_token: string;
 }
 
+/** Alleen Google-velden. Afvinken, volgorde en verbergen blijven buiten deze upsert. */
 function toRow(userId: string, event: MappedCalendarEvent) {
   return {
     user_id: userId,

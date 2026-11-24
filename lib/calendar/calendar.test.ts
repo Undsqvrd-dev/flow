@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { skipsAuth, googleAuthUrl } from '@/lib/calendar/authPaths';
-import { eventsOnDate, mapGoogleEvent, reconcileCalendar } from '@/lib/calendar/events';
+import { boardEventsOnDate, eventsOnDate, mapGoogleEvent, reconcileCalendar } from '@/lib/calendar/events';
 import { syncWindow } from '@/lib/calendar/time';
 
 describe('agendavenster', () => {
@@ -49,6 +49,21 @@ describe('Google-afspraak naar bordrij', () => {
     expect(eventsOnDate(mapped ? [mapped] : [], '2026-11-18')).toHaveLength(1);
     expect(eventsOnDate(mapped ? [mapped] : [], '2026-11-19')).toHaveLength(1);
     expect(eventsOnDate(mapped ? [mapped] : [], '2026-11-20')).toHaveLength(0);
+  });
+
+  it('haalt afgevinkte en verborgen afspraken van het bord', () => {
+    const base = {
+      eventDate: '2026-11-19',
+      endDate: '2026-11-20',
+      status: 'confirmed',
+    };
+    const events = [
+      { ...base, id: 'open', done: false, dismissedAt: null },
+      { ...base, id: 'af', done: true, dismissedAt: null },
+      { ...base, id: 'weg', done: false, dismissedAt: '2026-11-19T10:00:00.000Z' },
+    ];
+    expect(boardEventsOnDate(events, '2026-11-19').map((event) => event.id)).toEqual(['open']);
+    expect(eventsOnDate(events, '2026-11-19')).toHaveLength(3);
   });
 
   it('slaat afgezegde afspraken over', () => {

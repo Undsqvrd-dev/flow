@@ -18,6 +18,8 @@ export interface CalendarEvent {
   done: boolean;
   /** Null = nog niet met de hand gezet, dus tijdsvolgorde. */
   sortOrder: number | null;
+  /** Gezet via Verwijderen. Alleen in Flow; Google Agenda blijft staan. */
+  dismissedAt: string | null;
   updatedAt: string;
 }
 
