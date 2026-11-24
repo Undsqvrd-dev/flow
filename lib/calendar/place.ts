@@ -1,6 +1,6 @@
 import { format, parseISO } from 'date-fns';
 import { saveCalendarSortOrders } from '@/lib/calendar/client';
-import { eventsOnDate } from '@/lib/calendar/events';
+import { boardEventsOnDate } from '@/lib/calendar/events';
 import {
   insertDayCard,
   mixedDayCards,
@@ -44,7 +44,7 @@ function tasksOnDate(dateISO: string): Task[] {
 }
 
 function timedOnDate(dateISO: string): CalendarEvent[] {
-  return eventsOnDate(useCalendarStore.getState().events, dateISO).filter((event) => !event.allDay);
+  return boardEventsOnDate(useCalendarStore.getState().events, dateISO).filter((event) => !event.allDay);
 }
 
 function cardsOnDate(dateISO: string): DayCard<Task, CalendarEvent>[] {

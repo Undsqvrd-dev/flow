@@ -3,13 +3,15 @@
 import type { DraggableAttributes } from '@dnd-kit/core';
 import { useSortable, type useSortable as UseSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar } from 'lucide-react';
-import type { SyntheticEvent } from 'react';
+import { Calendar, Trash2 } from 'lucide-react';
+import { useState, type SyntheticEvent } from 'react';
 import { allDayOnDate, agendaDragId } from '@/lib/calendar/order';
-import { toggleCalendarEvent } from '@/lib/calendar/client';
+import { dismissCalendarEvent, toggleCalendarEvent } from '@/lib/calendar/client';
+import { deleteMenuStep } from '@/lib/cardMenu';
+import { ContextMenuItem, ContextMenuSurface } from '@/components/ui/context-menu';
 import type { CalendarEvent } from '@/stores/useCalendarStore';
 import { useCalendarStore } from '@/stores/useCalendarStore';
-import { cn } from '@/lib/utils';
+import { cn, isMobileViewport } from '@/lib/utils';
 
 type Drag = Pick<ReturnType<typeof UseSortable>, 'attributes' | 'listeners' | 'setNodeRef' | 'transform' | 'transition' | 'isDragging'>;
 
@@ -32,12 +34,28 @@ function stopDrag(event: SyntheticEvent) {
 
 function AgendaCardBody({ event, drag }: { event: CalendarEvent; drag: Drag | null }) {
   const href = event.htmlLink || event.meetLink;
+  const [leaving, setLeaving] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+
+  function checkOff() {
+    if (leaving || event.done) return;
+    setLeaving(true);
+    window.setTimeout(() => void toggleCalendarEvent(event.id, true), 160);
+  }
+
   return (
+    <div className={cn('transition-all duration-150', leaving && 'pointer-events-none scale-[0.98] opacity-0')}>
     <article
       ref={drag?.setNodeRef}
       style={drag ? { transform: CSS.Transform.toString(drag.transform), transition: drag.transition } : undefined}
       {...(drag?.attributes as DraggableAttributes | undefined)}
       {...drag?.listeners}
+      onContextMenu={(native) => {
+        native.preventDefault();
+        native.stopPropagation();
+        if (isMobileViewport()) return;
+        setMenu({ x: native.clientX, y: native.clientY });
+      }}
       className={cn(
         'rounded-card border border-amber/40 bg-amber/10 px-2.5 py-2',
         event.done && 'opacity-60',
@@ -48,10 +66,10 @@ function AgendaCardBody({ event, drag }: { event: CalendarEvent; drag: Drag | nu
       <div className="flex items-start gap-2">
         <input
           type="checkbox"
-          checked={event.done}
+          checked={event.done || leaving}
           onPointerDown={stopDrag}
           onClick={stopDrag}
-          onChange={() => void toggleCalendarEvent(event.id, !event.done)}
+          onChange={checkOff}
           className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-(--amber)"
           aria-label="Afspraak afvinken"
         />
@@ -77,6 +95,48 @@ function AgendaCardBody({ event, drag }: { event: CalendarEvent; drag: Drag | nu
         </div>
       </div>
     </article>
+    {menu && (
+      <AgendaContextMenu
+        x={menu.x}
+        y={menu.y}
+        onClose={() => setMenu(null)}
+        onDismiss={() => void dismissCalendarEvent(event.id)}
+      />
+    )}
+    </div>
+  );
+}
+
+function AgendaContextMenu({
+  x,
+  y,
+  onClose,
+  onDismiss,
+}: {
+  x: number;
+  y: number;
+  onClose: () => void;
+  onDismiss: () => void;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  return (
+    <ContextMenuSurface x={x} y={y} onClose={onClose}>
+      <ContextMenuItem
+        danger
+        onSelect={() => {
+          const step = deleteMenuStep(confirmDelete);
+          if (!step.remove) {
+            setConfirmDelete(true);
+            return;
+          }
+          onDismiss();
+          onClose();
+        }}
+      >
+        <Trash2 size={14} strokeWidth={1.75} />
+        {confirmDelete ? 'Zeker weten?' : 'Verwijderen'}
+      </ContextMenuItem>
+    </ContextMenuSurface>
   );
 }
 

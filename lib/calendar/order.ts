@@ -1,5 +1,5 @@
 import { isClosingRitual } from '@/lib/closing';
-import { eventsOnDate } from '@/lib/calendar/events';
+import { boardEventsOnDate } from '@/lib/calendar/events';
 
 export const AGENDA_DRAG_PREFIX = 'agenda:';
 
@@ -44,7 +44,7 @@ function isClosingCard<T extends MixedTask>(card: DayCard<T>): boolean {
 
 /** Hele-dag bovenaan, los van de sleepbare lijst. */
 export function allDayOnDate<E extends MixedEvent>(events: readonly E[], dateISO: string): E[] {
-  return eventsOnDate(events, dateISO)
+  return boardEventsOnDate(events, dateISO)
     .filter((event) => event.allDay)
     .sort((a, b) => a.title.localeCompare(b.title, 'nl'));
 }
